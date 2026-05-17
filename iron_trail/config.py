@@ -1,7 +1,12 @@
 """Project-wide configuration constants.
 
-Edit `BODY_WEIGHT_KG` to match your bodyweight — it's used to compute
-load for bodyweight + bodyweight-assisted exercises.
+This is the one file you should edit before running IronTrail with your own
+data. Two settings matter:
+
+1. ``BODY_WEIGHT_KG`` — drives bodyweight-load substitution + BW-relative
+   badge thresholds. The sidebar input overrides this at runtime, but this
+   is the default the app starts at.
+2. (optional) Override path constants below if you store data elsewhere.
 """
 from __future__ import annotations
 
@@ -18,4 +23,7 @@ EXERCISE_MAP_PATH = LOOKUPS_DIR / "exercise_muscle_map.csv"
 SAMPLE_CSV = SAMPLE_DIR / "sample_hevy_export.csv"
 PROCESSED_PARQUET = PROCESSED_DIR / "clean.parquet"
 
+# ⚠️ EDIT THIS to your bodyweight in kg.
+# Used for bodyweight + assisted-exercise load calculation and for badges
+# like "Bodyweight Bench" / "Double-BW Deadlift".
 BODY_WEIGHT_KG: float = 84.0

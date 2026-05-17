@@ -26,6 +26,9 @@ Thumbs.db
 # Streamlit
 .streamlit/secrets.toml
 
+# Markdown writeback output — generated training notes, user-specific
+vault-output/
+
 # Local-only screenshots (full-data variant); public set lives in docs/screenshots/
 scripts/screenshots/
 

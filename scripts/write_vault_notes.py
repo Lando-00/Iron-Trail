@@ -1,8 +1,16 @@
-"""CLI for generating IronTrail daily notes into a Quartz/Obsidian vault.
+"""CLI for generating IronTrail daily Markdown notes.
+
+Each workout becomes ``<output>/Hevy/Daily/YYYY-MM-DD.md`` with frontmatter
+plus a per-exercise breakdown. Designed for Obsidian / Logseq / any
+Markdown-based note-taking tool — it's just files in a folder.
 
 Usage::
 
-    python scripts/write_vault_notes.py --vault D:/Dev/Quartz/Vault [--since 2026-01-01] [--csv path/to/export.csv]
+    python scripts/write_vault_notes.py --vault /path/to/your/vault [--since 2026-01-01] [--csv path/to/export.csv]
+
+On Windows::
+
+    python scripts/write_vault_notes.py --vault "C:/Users/you/Documents/ObsidianVault"
 """
 from __future__ import annotations
 
@@ -18,7 +26,15 @@ from iron_trail import config, ingest, vault_notes
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Generate Markdown daily notes from a Hevy CSV.")
-    p.add_argument("--vault", required=True, help="Path to your Obsidian vault root (e.g. D:/Dev/Quartz/Vault)")
+    p.add_argument(
+        "--vault",
+        default="vault-output",
+        help=(
+            "Output directory. Each workout becomes <dir>/Hevy/Daily/YYYY-MM-DD.md. "
+            "Point this at your Obsidian vault root, or any folder. "
+            "Defaults to ./vault-output/ in the repo for a quick demo."
+        ),
+    )
     p.add_argument("--csv", help="Hevy CSV path. Defaults to the most recent CSV in data/raw/.")
     p.add_argument("--since", help="Only write notes on or after YYYY-MM-DD.", default=None)
     p.add_argument("--bodyweight", type=float, default=config.BODY_WEIGHT_KG)

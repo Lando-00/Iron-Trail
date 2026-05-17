@@ -92,14 +92,63 @@ On macOS / Linux, swap `Activate.ps1` for `source .venv/bin/activate`.
 
 1. In the Hevy app: **Profile → Settings → Export Workout Data**.
 2. Save the CSV into `data/raw/`. It's [gitignored](.gitignore) — your data
-   stays local.
+   stays local. The app auto-picks the most-recent CSV in that folder.
 3. In the IronTrail sidebar, pick your CSV from the **Data source** dropdown.
 4. Set your **Bodyweight (kg)** in the sidebar — it's used to compute load
    for bodyweight + bodyweight-assisted exercises (e.g. assisted pull-ups)
    and for any bodyweight-relative badge.
-5. Optional: click **📝 Generate daily notes** to write
-   `Vault/Hevy/Daily/YYYY-MM-DD.md` into the vault path you specify in the
-   sidebar.
+5. Optional: click **📝 Generate daily notes** to write one Markdown file
+   per workout into the **Output directory** you specify (defaults to
+   `./vault-output/` in the repo). Works with Obsidian, Logseq, or any
+   tool that reads Markdown.
+
+That's the whole setup — no API key, no account, no env file. Everything
+that matters is exposed via the sidebar.
+
+## 📝 Markdown writeback — what the button does
+
+Click **📝 Generate daily notes** and every workout in the loaded CSV
+becomes `<output>/Hevy/Daily/YYYY-MM-DD.md`. Example output for one
+workout:
+
+```markdown
+---
+date: 2026-05-14
+title: "Short sesh"
+duration_min: 47
+tonnage_kg: 4030
+set_count: 12
+exercises_logged: 3
+tags:
+  - hevy/session
+---
+
+# Short sesh
+`2026-05-14 20:50` — 47 min · **4,030 kg** · 12 working sets · 3 exercises
+
+## Exercises
+- **Butterfly (Pec Deck)** — 45kg × 10 · 50kg × 8 · 40kg × 2  _(top e1RM 63.3 kg)_
+- **Incline Bench Press (Dumbbell)** — 60kg × 9 · 60kg × 6  _(top e1RM 78.0 kg)_
+- **Lat Pulldown (Cable)** — 45kg × 8 · 55kg × 12 · 60kg × 5  _(top e1RM 77.0 kg)_
+
+## Per-exercise notes
+- **Incline Bench Press (Dumbbell):** 30kgs x 2dbs = 60kgs. 9 reps woo.
+```
+
+**Setups it works for:**
+
+| You use… | Point the **Output directory** at… |
+|---|---|
+| Obsidian | Your vault root, e.g. `~/Documents/ObsidianVault` |
+| Logseq | Your graph directory |
+| Just text files | Any folder you like, e.g. `~/training-log` |
+| Nothing in particular | Leave it as `vault-output/` and browse the files in VS Code / GitHub |
+
+The CLI variant (`python scripts/write_vault_notes.py --vault <dir>`) does
+the same thing headless — handy for cron / Task Scheduler / CI.
+
+Frontmatter is numeric where it makes sense (`tonnage_kg`, `set_count`)
+so it's filterable by Obsidian Dataview / Bases queries.
 
 ## Configuration
 

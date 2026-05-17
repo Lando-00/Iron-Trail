@@ -42,10 +42,15 @@ with st.sidebar:
     )
     st.caption("Used for bodyweight + assisted-exercise load calculations and BW-relative badges.")
     st.divider()
-    st.markdown("**Vault writeback**")
+    st.markdown("**Markdown writeback**")
     vault_path = st.text_input(
-        "Vault path", value="D:/Dev/Quartz/Vault",
-        help="Each workout becomes Hevy/Daily/YYYY-MM-DD.md",
+        "Output directory",
+        value="vault-output",
+        help=(
+            "Each workout becomes <dir>/Hevy/Daily/YYYY-MM-DD.md. "
+            "Point this at your Obsidian vault (or Logseq, or any folder). "
+            "Defaults to ./vault-output/ in the repo for a quick demo."
+        ),
     )
     vault_since = st.date_input(
         "From date", value=pd.Timestamp.now().normalize().date() - pd.Timedelta(days=30),
