@@ -83,6 +83,33 @@ html, body, [class*="css"], .stApp {
     font-family: 'JetBrains Mono', monospace;
 }
 
+/* Coach page — review card */
+.it-review-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 28px 36px;
+    margin: 20px 0;
+}
+.it-review-card h1,
+.it-review-card h2,
+.it-review-card h3 { color: #e7e7e9; }
+.it-review-card h2 {
+    color: #d4a843;
+    font-size: 17px;
+    margin-top: 24px;
+    border-bottom: 1px solid rgba(212, 168, 67, 0.18);
+    padding-bottom: 8px;
+}
+
+.it-coach-empty {
+    border: 1px dashed rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    padding: 60px 24px;
+    text-align: center;
+    color: #8a8a93;
+}
+
 /* Sidebar */
 [data-testid="stSidebar"] {
     background: rgba(10, 10, 12, 0.6);

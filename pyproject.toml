@@ -11,6 +11,9 @@ dependencies = [
     "numpy>=1.26",
     "pyarrow>=17.0",
     "scikit-learn>=1.4",
+    "github-copilot-sdk>=0.3",
+    "markdown>=3.5",
+    "xhtml2pdf>=0.2.16",
 ]
 
 [project.optional-dependencies]
