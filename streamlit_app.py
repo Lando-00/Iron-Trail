@@ -10,37 +10,13 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from iron_trail import analytics, config, ingest, metrics, theme, ui
+from iron_trail import analytics, config, metrics, sidebar, theme, ui
 
 ui.setup_page("IronTrail", "🏋️")
 
 
-@st.cache_data(show_spinner="Parsing Hevy CSV…")
-def load_data(csv_path: str, body_weight_kg: float) -> pd.DataFrame:
-    return ingest.load_and_clean(Path(csv_path), body_weight_kg=body_weight_kg)
-
-
-def csv_choices() -> list[str]:
-    raw = sorted(config.RAW_DIR.glob("*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
-    items = [str(p) for p in raw]
-    if config.SAMPLE_CSV.exists():
-        items.append(str(config.SAMPLE_CSV))
-    return items or [str(config.SAMPLE_CSV)]
-
-
 with st.sidebar:
-    st.markdown("### 🏋️ IronTrail")
-    st.caption("Personal training dashboard")
-    st.divider()
-    options = csv_choices()
-    selected = st.selectbox(
-        "Data source", options, index=0,
-        format_func=lambda p: Path(p).name,
-    )
-    body_weight = st.number_input(
-        "Bodyweight (kg)", value=float(config.BODY_WEIGHT_KG), step=0.5, min_value=30.0,
-    )
-    st.caption("Used for bodyweight + assisted-exercise load calculations and BW-relative badges.")
+    df, source_label, body_weight = sidebar.render_data_source()
     st.divider()
     st.markdown("**Markdown writeback**")
     vault_path = st.text_input(
@@ -56,13 +32,6 @@ with st.sidebar:
         "From date", value=pd.Timestamp.now().normalize().date() - pd.Timedelta(days=30),
     )
     do_vault_write = st.button("📝 Generate daily notes")
-    st.divider()
-    st.markdown(
-        "**Drop a CSV into `data/raw/`** to use real data. "
-        "Sample data ships for the public demo."
-    )
-
-df = load_data(selected, body_weight)
 
 if do_vault_write:
     from iron_trail import vault_notes
@@ -94,7 +63,7 @@ ui.hero(
     unit="kg",
     subtitle=(
         f"{total_workouts} workouts across {years_active:.1f} years of training — "
-        f"{Path(selected).name}"
+        f"{source_label}"
     ),
 )
 

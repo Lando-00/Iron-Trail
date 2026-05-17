@@ -46,8 +46,9 @@ def load_exercise_map(path: Path | None = None) -> pd.DataFrame:
     return pd.read_csv(path)
 
 
-def load_hevy_csv(path: Path) -> pd.DataFrame:
-    df = pd.read_csv(path)
+def load_hevy_csv(source) -> pd.DataFrame:
+    """Load a Hevy export from a path, string, or file-like / BytesIO source."""
+    df = pd.read_csv(source)
     df["exercise_title"] = df["exercise_title"].astype(str).map(normalize_exercise_title)
     return df
 
@@ -98,10 +99,19 @@ def clean(
 
 
 def load_and_clean(
-    csv_path: Path | None = None,
+    csv_source=None,
     body_weight_kg: float = config.BODY_WEIGHT_KG,
 ) -> pd.DataFrame:
-    csv_path = Path(csv_path) if csv_path else config.SAMPLE_CSV
-    raw = load_hevy_csv(csv_path)
+    """Load and clean a Hevy CSV from any source pandas understands.
+
+    ``csv_source`` may be a ``Path``, ``str``, file-like object, or
+    ``BytesIO`` (e.g. from ``st.file_uploader``). Defaults to the bundled
+    sample if ``None``.
+    """
+    if csv_source is None:
+        csv_source = config.SAMPLE_CSV
+    if isinstance(csv_source, str):
+        csv_source = Path(csv_source)
+    raw = load_hevy_csv(csv_source)
     emap = load_exercise_map()
     return clean(raw, emap, body_weight_kg=body_weight_kg)

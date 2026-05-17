@@ -7,31 +7,13 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from iron_trail import analytics, config, ingest, metrics, theme, ui
+from iron_trail import analytics, config, metrics, sidebar, theme, ui
 
 ui.setup_page("Adherence · IronTrail", "📅")
 
 
-@st.cache_data(show_spinner="Parsing Hevy CSV…")
-def load_data(csv_path: str, body_weight_kg: float) -> pd.DataFrame:
-    return ingest.load_and_clean(Path(csv_path), body_weight_kg=body_weight_kg)
-
-
-def csv_choices() -> list[str]:
-    raw = sorted(config.RAW_DIR.glob("*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
-    items = [str(p) for p in raw]
-    if config.SAMPLE_CSV.exists():
-        items.append(str(config.SAMPLE_CSV))
-    return items or [str(config.SAMPLE_CSV)]
-
-
 with st.sidebar:
-    st.markdown("### 🏋️ IronTrail")
-    selected = st.selectbox("Data source", csv_choices(), index=0,
-                            format_func=lambda p: Path(p).name)
-    body_weight = st.number_input("Bodyweight (kg)", value=float(config.BODY_WEIGHT_KG), step=0.5)
-
-df = load_data(selected, body_weight)
+    df, _, body_weight = sidebar.render_data_source()
 
 st.title("📅 Adherence")
 
