@@ -8,3 +8,4 @@ scikit-learn>=1.4
 github-copilot-sdk>=0.3
 markdown>=3.5
 xhtml2pdf>=0.2.16
+Pillow>=10.0

@@ -123,6 +123,45 @@ c2.metric("Max e1RM", f"{maxv:.1f} kg")
 c3.metric("Latest e1RM", f"{last:.1f} kg")
 c4.metric("Change since first", f"{last - first:+.1f} kg")
 
+# =====================================================================
+# PR Poster
+# =====================================================================
+from iron_trail import posters
+
+ui.section_title("📸 PR Poster")
+
+prs_for_ex = posters.find_recent_prs(df)
+prs_for_ex = prs_for_ex[prs_for_ex["exercise_title"] == exercise]
+if prs_for_ex.empty:
+    st.caption("No PR-eligible working sets recorded for this exercise yet.")
+else:
+    latest_pr = prs_for_ex.iloc[0]
+    pc1, pc2 = st.columns([2, 1])
+    with pc1:
+        prev_str = (
+            f"+{latest_pr['e1rm_kg'] - latest_pr['prev_e1rm_kg']:.1f} kg vs previous"
+            if pd.notna(latest_pr["prev_e1rm_kg"]) else "first recorded PR"
+        )
+        st.markdown(
+            f"**Latest PR:** {latest_pr['weight_kg_load']:.0f} kg × "
+            f"{int(latest_pr['reps'])} (e1RM {latest_pr['e1rm_kg']:.1f} kg) — "
+            f"{prev_str}, on "
+            f"{pd.to_datetime(latest_pr['workout_date']).strftime('%d %b %Y')}."
+        )
+    with pc2:
+        try:
+            png_bytes = posters.render_pr_poster_for_row(latest_pr)
+            safe_ex = "".join(c if c.isalnum() else "_" for c in exercise)
+            st.download_button(
+                "📸 Download 1080×1080",
+                data=png_bytes,
+                file_name=f"PR_{safe_ex}_{latest_pr['workout_date']}.png",
+                mime="image/png",
+                use_container_width=True,
+            )
+        except Exception as e:
+            st.caption(f"Poster render failed: {e}")
+
 if show_yoy:
     yoy = analytics.year_over_year(df, exercise, weeks=16)
     if yoy is None or yoy["last_year"].empty:

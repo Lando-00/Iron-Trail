@@ -194,6 +194,24 @@ with st.expander("💀 Hall of Shame — the least-productive sessions"):
                 stats=f"{row['total_volume']:,.0f} kg · {row['set_count']} sets · {row['duration_min']:.0f} min",
             )
 
+with st.expander("🏆 Hall of Fame — the sessions to remember"):
+    best = analytics.best_sessions(df, n=5)
+    if best.empty:
+        st.caption("Train more, come back. The Hall accepts applications.")
+    else:
+        for _, row in best.iterrows():
+            stats = (
+                f"{row['total_volume']:,.0f} kg · {row['set_count']} sets · "
+                f"{row['duration_min']:.0f} min · top {row['top_weight_kg']:.0f} kg · "
+                f"{row['muscles_hit']} muscles"
+            )
+            ui.highlight_card(
+                date_str=pd.to_datetime(row["workout_date"]).strftime("%a, %d %b %Y"),
+                title=row["title"] or "Untitled",
+                caption=row["caption"],
+                stats=stats,
+            )
+
 # =====================================================================
 # RECENT WORKOUTS
 # =====================================================================

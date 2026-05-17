@@ -445,3 +445,67 @@ def worst_sessions(df: pd.DataFrame, n: int = 5) -> pd.DataFrame:
     rng = np.random.default_rng(seed=42)
     worst["caption"] = [comedy.caption_for_session(row, rng) for _, row in worst.iterrows()]
     return worst
+
+
+def best_sessions(df: pd.DataFrame, n: int = 5) -> pd.DataFrame:
+    """The inverse of worst_sessions — top N by an "underrated metric" score.
+
+    Score combines:
+      - total working-set volume (z-score)
+      - number of distinct muscle groups hit (z-score)
+      - heaviest top set (z-score)
+      - biggest e1RM jump within the session vs the user's running max
+    """
+    rows = []
+    for wid, g in df.groupby("workout_id"):
+        working = g[g["is_working"]]
+        if working.empty:
+            continue
+        total_vol = float(working["volume_kg"].sum())
+        if total_vol < 100:
+            continue
+        rows.append({
+            "workout_id": wid,
+            "workout_date": g["workout_date"].iloc[0],
+            "title": g["title"].iloc[0],
+            "total_volume": total_vol,
+            "set_count": int(len(working)),
+            "duration_min": float(g["duration_min"].iloc[0] or 0),
+            "muscles_hit": int(working["primary_muscle"].nunique()),
+            "top_weight_kg": float(working["weight_kg_load"].max() or 0),
+            "top_e1rm_kg": float(working["e1rm_kg"].max() or 0),
+        })
+    s = pd.DataFrame(rows)
+    if s.empty:
+        return s
+
+    # z-score each contributing column (guard against zero std)
+    def z(col: str) -> pd.Series:
+        std = s[col].std()
+        if std == 0 or pd.isna(std):
+            return pd.Series(0.0, index=s.index)
+        return (s[col] - s[col].mean()) / std
+
+    s["score"] = (
+        1.0 * z("total_volume")
+        + 0.7 * z("muscles_hit")
+        + 1.0 * z("top_weight_kg")
+        + 0.6 * z("top_e1rm_kg")
+    )
+
+    best = s.nlargest(n, "score").reset_index(drop=True)
+
+    # Classify "what kind of best day" each was, used by the smart caption picker
+    def kind_for(row) -> str:
+        if row["top_weight_kg"] >= s["top_weight_kg"].quantile(0.90):
+            return "heavy"
+        if row["muscles_hit"] >= s["muscles_hit"].quantile(0.85):
+            return "marathon"
+        return "all_round"
+
+    best["kind"] = best.apply(kind_for, axis=1)
+
+    from . import comedy
+    rng = np.random.default_rng(seed=11)
+    best["caption"] = [comedy.caption_for_hof_session(row, rng) for _, row in best.iterrows()]
+    return best

@@ -30,15 +30,20 @@ an LLM-written weekly review.
 
 | Page | What it shows |
 |---|---|
-| 🏋️ **Overview** | Lifetime tonnage hero, last-30-day mini-metrics with sparklines, plateau watch with personality messages, recent unlocks + next targets, Hall of Shame, recent workouts table |
-| 💪 **Strength** | Per-exercise e1RM (Epley) trend with PR stars, optional numpy-polyfit forecast with widening confidence band, optional year-over-year overlay |
+| 🏋️ **Overview** | Lifetime tonnage hero, last-30-day mini-metrics with sparklines, plateau watch, recent unlocks + next targets, **Hall of Shame + Hall of Fame**, recent workouts |
+| 💪 **Strength** | Per-exercise e1RM trend with PR stars, optional forecast band, optional year-over-year overlay, **📸 PR Poster download** |
 | 📊 **Volume** | Weekly tonnage stacked by muscle, push:pull ratio over time, 8-pattern movement radar against an 8-sets/week minimum-effective-volume target |
 | 📅 **Adherence** | Calendar coloured by K-Means session archetype (Strength / Hypertrophy / Pump / Quick), archetype distribution, time-of-day histogram |
 | 🏆 **Achievements** | 20-badge library with progress bars, closest-to-unlock callout, unlocked/locked walls |
+| 😂 **Quotes** | Indecisive-naming clusters, single-word laments, self-roasting, emoji-heavy titles — your real workout titles surfaced as a wall |
+| 💬 **Coach** *(new)* | LLM-written weekly + monthly training reviews, "Ask Your Data" chat, 5 personality presets. Export as Markdown / PDF / save-to-vault. Powered by your Copilot Pro sub. |
 
-Plus a **💀 Hall of Shame** expander on Overview (worst-performing sessions
-with witty captions) and a **📝 Generate daily notes** button that writes
-per-workout Markdown into a Vault path of your choosing.
+Plus a **💀 Hall of Shame** + **🏆 Hall of Fame** expander on Overview
+(worst and best sessions with witty captions), a **📝 Generate daily
+notes** button that writes per-workout Markdown into a Vault path of
+your choosing, and an optional **`/lift-review`** Copilot CLI extension
+at `~/.copilot/extensions/lift-trail/` for triggering reviews without
+opening Streamlit.
 
 ### Gallery
 
@@ -149,6 +154,77 @@ the same thing headless — handy for cron / Task Scheduler / CI.
 
 Frontmatter is numeric where it makes sense (`tonnage_kg`, `set_count`)
 so it's filterable by Obsidian Dataview / Bases queries.
+
+## 💬 The Coach — AI weekly + monthly reviews
+
+The **Coach** page (`pages/6_💬_Coach.py`) is a first-class feature: it
+asks Copilot to write training reviews of your data inline, and gives you
+four ways to export the result.
+
+```
+You ──▶ click "Generate weekly review"
+         │
+         ▼
+    coach.summary.build_weekly(df) ──▶ structured dict (sessions, top e1RMs,
+         │                              plateaus, push:pull, archetype mix)
+         ▼
+    coach.providers.copilot ──▶ Copilot SDK ──▶ your Copilot Pro sub
+         │
+         │ Markdown body
+         ▼
+    coach.render.weekly_review_md  ──▶  💾 Save to Vault  ⬇️ Download .md
+                                       📄 Download PDF   📋 Copy
+```
+
+**Three triggers** — all share the same Python coach module:
+
+| Trigger | Where | When to use |
+|---|---|---|
+| 💬 Coach page button | Streamlit dashboard | On-demand, you want to read it inline |
+| `scripts/lift_review.py --vault <path>` | Terminal | Cron / Task Scheduler / scripting |
+| `/lift-review` slash command | Copilot CLI | In-flow while working in your vault |
+
+**Five personality presets** — same factual contract, different voice:
+*Neutral · RP Strength · Stronger By Science · Calm Therapist · Goggins Mode*.
+
+**Hallucination guard by construction** — every number you see in a
+review comes from the structured summary, never from the LLM. The
+rendered Markdown is composed as: frontmatter → **Stats** block (from
+data) → **Reflections** block (from LLM) → footer.
+
+### Installing the `/lift-review` slash command
+
+The extension is **optional** — the Streamlit Coach page works without
+it. If you want the slash command:
+
+```powershell
+# clone iron-trail to D:\Dev\iron-trail  (or wherever — see env vars below)
+git clone https://github.com/Lando-00/Iron-Trail.git D:\Dev\iron-trail
+cd D:\Dev\iron-trail
+python -m venv .venv ; .\.venv\Scripts\Activate.ps1 ; pip install -r requirements.txt
+
+# install the extension (Windows)
+Copy-Item -Recurse extensions\lift-trail $env:USERPROFILE\.copilot\extensions\
+
+# in the Copilot CLI: /clear  ← reloads extensions, /lift-review now available
+```
+
+Environment variables (set in your shell profile, all optional):
+
+```
+IRON_TRAIL_REPO   = D:/Dev/iron-trail            # default
+IRON_TRAIL_VAULT  = <repo>/vault-output          # default
+IRON_TRAIL_VENV   = <repo>/.venv                 # default
+```
+
+Commands:
+
+| Command | What it does |
+|---|---|
+| `/lift-review` | Generate the weekly review and save to `<vault>/Hevy/Reviews/YYYY-Www.md` |
+| `/lift-review --personality goggins` | Same, but in the chosen voice |
+| `/lift-recap` | Generate the monthly recap → `<vault>/Hevy/Monthly/YYYY-MM.md` |
+| `/lift-review --vault D:/Other/Vault` | Override the vault path for one call |
 
 ## Configuration
 

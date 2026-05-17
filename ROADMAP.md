@@ -36,25 +36,48 @@ charts, no surprises.
 - **Sample data** — deterministic 90-day synthetic CSV (`seed=42`) ships so
   the public demo runs without anyone's real data.
 
-## Phase 2 — AI Training Coach
+## Phase 2 — AI Training Coach ✅
 
-A scheduled job that summarises last week's training and writes a Markdown
-review note into the Obsidian vault. Closes the loop: dashboard for drill-in,
-weekly review for the bird's-eye.
+The Coach lives in the dashboard as a first-class feature. Reviews
+generate inline, render as Markdown right in the page, and offer four
+export buttons (Save to Vault · Download .md · PDF · Copy).
 
-- **Weekly summary builder** — structured JSON: sessions, exercises, volumes,
-  PRs, plateaus, push:pull ratio, streak status, archetype mix.
-- **LLM call** — JSON + curated system prompt → Markdown review. System prompt
-  is grounded on Stronger By Science / Renaissance Periodization with an
-  explicit "do not invent numbers" rule.
-- **Write to vault** — `Vault/Hevy/Reviews/YYYY-Www.md` with frontmatter
-  structured enough to support a future `quartz-vault` query
-  ("show all weeks where push:pull ratio < 0.8").
-- **Provider** — likely [GitHub Models](https://github.com/marketplace/models)
-  for the free tier, or a Copilot CLI extension hooked to `/hevy-review`.
-- **Scheduler** — Windows Task Scheduler is the path of least resistance.
-  GitHub Actions cron is cleaner but needs the CSV pushed to a private repo
-  or auto-fetched via the Pro API.
+- **Coach page** (`pages/6_💬_Coach.py`) — four tabs:
+  - 📅 **Weekly** — generates an LLM-written review of the last complete
+    ISO week, grounded in a structured Stats block (numbers from data,
+    prose from the LLM).
+  - 🗓️ **Monthly** — same but over a 4-week window, with per-exercise
+    1RM trajectory and archetype mix.
+  - 💬 **Ask Your Data** — multi-turn chat scoped to the loaded CSV,
+    8-turn history cap.
+  - 🎭 **Settings** — personality preset + provider status.
+- **Provider** — official `github-copilot-sdk` Python package, wrapping the
+  user's existing Copilot Pro subscription. No extra API key. A
+  deterministic `MockProvider` (`COACH_LLM=mock`) lets contributors hack
+  without burning tokens.
+- **Five personality presets** — Neutral, RP Strength, Stronger By
+  Science, Calm Therapist, Goggins Mode. Identical factual contract,
+  different tone.
+- **Hallucination guard** — numeric facts in every review come from the
+  structured summary, never the LLM. Renderer composes: frontmatter →
+  Stats block (from data) → Reflections block (from LLM) → footer.
+- **Vault writeback** —
+  `<vault>/Hevy/Reviews/YYYY-Www.md` and `<vault>/Hevy/Monthly/YYYY-MM.md`,
+  with queryable YAML frontmatter (`session_count`, `total_volume_kg`,
+  `push_pull_ratio`, `personality`, tags).
+- **PDF export** — `xhtml2pdf` pure-Python pipeline, dark+gold CSS,
+  emoji-fallback table for the bits the PDF font can't render.
+- **`/lift-review` slash command** — user-global Copilot CLI extension at
+  `~/.copilot/extensions/lift-trail/`. Two commands: `/lift-review` and
+  `/lift-recap`. Both shell out to `scripts/lift_review.py` and stream
+  progress into the CLI timeline.
+- **🏆 Hall of Fame** — gold-glow inverse of Hall of Shame. Best sessions
+  ranked by an underrated-metric score (volume × muscles hit × top
+  weight × top e1RM). 30 captions across three tones (heavy day,
+  marathon day, all-round day) with smart picker.
+- **📸 PR Poster generator** — 1080×1080 PNG, dark+gold, JetBrains Mono
+  numbers. Auto-detects PRs from the loaded CSV; available as a button
+  on the Strength page and as a batch CLI at `scripts/render_pr_poster.py`.
 
 ## Phase 3 — Cross-source
 
@@ -74,14 +97,11 @@ Triggered when CSV re-export becomes the actual blocker.
 
 Maybe someday, no commitments:
 
-- **PR poster generator** — auto-render a shareable poster the moment a PR
-  lands. Big number, exercise name, before/after.
 - **Lift Wrapped** — annual end-of-year slideshow (most-loved lift, biggest
   jump, longest streak, archetype shift). Spotify Wrapped for the gym.
 - **Spotify correlation** — does playlist BPM correlate with session volume?
   Cross-reference Hevy timestamps against Spotify listening history.
 - **Weather context** — overlay outdoor temperature on adherence. Did the
   cold snap actually wreck the streak or am I making excuses?
-- **Hall of Fame** — the inverse of Hall of Shame. Top sessions ranked by
-  underrated metrics (best rep-quality, biggest e1RM jump, longest superset
-  chain).
+- **Form-check uploader** — drop a phone video of a heavy set, vision LLM
+  returns form notes.

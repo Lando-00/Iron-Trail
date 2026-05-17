@@ -110,6 +110,33 @@ html, body, [class*="css"], .stApp {
     color: #8a8a93;
 }
 
+/* Hall of Fame highlight card (gold-glow inverse of lowlight) */
+.it-highlight {
+    background: linear-gradient(135deg, rgba(212, 168, 67, 0.07), rgba(212, 168, 67, 0.015));
+    border: 1px solid rgba(212, 168, 67, 0.30);
+    border-left: 3px solid #d4a843;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin: 8px 0;
+    box-shadow: 0 4px 18px rgba(212, 168, 67, 0.06);
+}
+.it-highlight-date {
+    font-family: 'JetBrains Mono', monospace;
+    color: #d4a843;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 700;
+}
+.it-highlight-title { color: #e7e7e9; font-weight: 600; margin-top: 4px; }
+.it-highlight-caption { color: #e6c887; font-style: italic; font-size: 13px; margin-top: 6px; }
+.it-highlight-stats {
+    font-family: 'JetBrains Mono', monospace;
+    color: #8a8a93;
+    font-size: 11px;
+    margin-top: 8px;
+}
+
 /* Sidebar */
 [data-testid="stSidebar"] {
     background: rgba(10, 10, 12, 0.6);
@@ -440,6 +467,19 @@ def lowlight_card(date_str: str, title: str, caption: str, stats: str) -> None:
         f'<div class="it-lowlight-title">{title}</div>'
         f'<div class="it-lowlight-caption">"{caption}"</div>'
         f'<div class="it-lowlight-stats">{stats}</div>'
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def highlight_card(date_str: str, title: str, caption: str, stats: str) -> None:
+    """Gold-glow inverse of lowlight_card — for Hall of Fame entries."""
+    st.markdown(
+        f'<div class="it-highlight">'
+        f'<div class="it-highlight-date">{date_str}</div>'
+        f'<div class="it-highlight-title">{title}</div>'
+        f'<div class="it-highlight-caption">"{caption}"</div>'
+        f'<div class="it-highlight-stats">{stats}</div>'
         f"</div>",
         unsafe_allow_html=True,
     )

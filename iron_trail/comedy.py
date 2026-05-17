@@ -72,6 +72,68 @@ CAPTIONS_SARCASTIC_PRAISE = [
 ]
 
 
+# =====================================================================
+# Hall of Fame caption pools — gold-glow side
+# =====================================================================
+
+HOF_CAPTIONS_HEAVY = [
+    "the bar checked into therapy after this",
+    "your shadow asked for an autograph",
+    "the rack filed a workers' comp claim",
+    "iron trembled and history was written",
+    "this set was the lecture, the bar was the student",
+    "every plate in the gym felt that",
+    "the spotter became a fan",
+    "the warmup set was someone else's PR",
+    "the bumper plates stopped bouncing out of respect",
+    "future-you watches the replay",
+]
+
+HOF_CAPTIONS_MARATHON = [
+    "you brought a whole anatomy textbook to this one",
+    "Iron Trail's stats engine asked for overtime pay",
+    "the chalk bucket needs a moment",
+    "every muscle group filed for attendance",
+    "an honest, sweaty masterpiece",
+    "the foam roller refused service tomorrow",
+    "the gym staff started a tab",
+    "no muscle left unconsulted",
+    "your shower will be a religious experience",
+    "the rest of the week is a victory lap",
+]
+
+HOF_CAPTIONS_ALL_ROUND = [
+    "balanced, dignified, devastating",
+    "this is the photo on the recruiting poster",
+    "the dashboard had to double-check the numbers",
+    "your future self is taking notes",
+    "a quietly brutal piece of work",
+    "the kind of day that justifies the alarm clock",
+    "the receipts say 'all of the above'",
+    "nothing fancy, just complete",
+    "a session that earns its own gold star",
+    "you're allowed to feel smug about this one",
+]
+
+
+HOF_CAPTION_POOLS = {
+    "heavy": HOF_CAPTIONS_HEAVY,
+    "marathon": HOF_CAPTIONS_MARATHON,
+    "all_round": HOF_CAPTIONS_ALL_ROUND,
+}
+
+
+def caption_for_hof_session(row: dict | pd.Series, rng: np.random.Generator) -> str:
+    """Pick a Hall-of-Fame caption matched to the *kind* of best-day this was.
+
+    ``row["kind"]`` is one of: ``heavy`` (a top-weight day), ``marathon``
+    (lots of muscles hit), or ``all_round`` (balanced contributions).
+    """
+    kind = str(row.get("kind", "all_round"))
+    pool = HOF_CAPTION_POOLS.get(kind, HOF_CAPTIONS_ALL_ROUND)
+    return str(rng.choice(pool))
+
+
 CAPTION_POOLS = {
     "short_session": CAPTIONS_SHORT_SESSION,
     "minimal_effort": CAPTIONS_MINIMAL_EFFORT,
