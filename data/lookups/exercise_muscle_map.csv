@@ -1,0 +1,178 @@
+exercise_title,primary_muscle,equipment,movement_type,load_type,movement_pattern
+Bench Press (Barbell),chest,barbell,push,weighted,horizontal_push
+Bench Press (Dumbbell),chest,dumbbell,push,weighted,horizontal_push
+Bench Press - Close Grip (Barbell),triceps,barbell,push,weighted,horizontal_push
+Bench Press - Wide Grip (Barbell),chest,barbell,push,weighted,horizontal_push
+Chest Press (Machine),chest,machine,push,weighted,horizontal_push
+Incline Bench Press (Dumbbell),chest,dumbbell,push,weighted,horizontal_push
+Incline Bench Press (Barbell),chest,barbell,push,weighted,horizontal_push
+Incline Chest Press (Machine),chest,machine,push,weighted,horizontal_push
+Decline Bench Press (Barbell),chest,barbell,push,weighted,horizontal_push
+Decline Bench Press (Dumbbell),chest,dumbbell,push,weighted,horizontal_push
+Chest Fly (Machine),chest,machine,push,weighted,horizontal_push
+Chest Fly (Dumbbell),chest,dumbbell,push,weighted,horizontal_push
+Butterfly (Pec Deck),chest,machine,push,weighted,horizontal_push
+Cable Crossover,chest,cable,push,weighted,horizontal_push
+Push Up,chest,bodyweight,push,bodyweight,horizontal_push
+Overhead Press (Barbell),shoulders,barbell,push,weighted,vertical_push
+Overhead Press (Dumbbell),shoulders,dumbbell,push,weighted,vertical_push
+Shoulder Press (Dumbbell),shoulders,dumbbell,push,weighted,vertical_push
+Shoulder Press (Machine),shoulders,machine,push,weighted,vertical_push
+Seated Shoulder Press (Machine),shoulders,machine,push,weighted,vertical_push
+Arnold Press (Dumbbell),shoulders,dumbbell,push,weighted,vertical_push
+Lateral Raise (Dumbbell),shoulders,dumbbell,push,weighted,vertical_push
+Lateral Raise (Cable),shoulders,cable,push,weighted,vertical_push
+Lateral Raise (Machine),shoulders,machine,push,weighted,vertical_push
+Front Raise (Dumbbell),shoulders,dumbbell,push,weighted,vertical_push
+Front Raise (Cable),shoulders,cable,push,weighted,vertical_push
+Triceps Pushdown,triceps,cable,push,weighted,horizontal_push
+Triceps Rope Pushdown,triceps,cable,push,weighted,horizontal_push
+Triceps Extension (Cable),triceps,cable,push,weighted,horizontal_push
+Triceps Extension (Dumbbell),triceps,dumbbell,push,weighted,horizontal_push
+Triceps Extension (Machine),triceps,machine,push,weighted,horizontal_push
+Overhead Triceps Extension (Cable),triceps,cable,push,weighted,vertical_push
+Skullcrusher (Barbell),triceps,barbell,push,weighted,horizontal_push
+Skullcrusher (Dumbbell),triceps,dumbbell,push,weighted,horizontal_push
+Dip,triceps,bodyweight,push,bodyweight,horizontal_push
+Triceps Dip,triceps,bodyweight,push,bodyweight,horizontal_push
+Triceps Dip (Weighted),triceps,bodyweight,push,bodyweight,horizontal_push
+Dip (Assisted),triceps,machine,push,assisted,horizontal_push
+Triceps Dip (Assisted),triceps,machine,push,assisted,horizontal_push
+Squat (Barbell),quadriceps,barbell,legs,weighted,squat
+Front Squat (Barbell),quadriceps,barbell,legs,weighted,squat
+Goblet Squat,quadriceps,dumbbell,legs,weighted,squat
+Hack Squat (Machine),quadriceps,machine,legs,weighted,squat
+Leg Press,quadriceps,machine,legs,weighted,squat
+Leg Press (Machine),quadriceps,machine,legs,weighted,squat
+Leg Press Horizontal (Machine),quadriceps,machine,legs,weighted,squat
+Leg Extension,quadriceps,machine,legs,weighted,squat
+Leg Extension (Machine),quadriceps,machine,legs,weighted,squat
+Bulgarian Split Squat,quadriceps,dumbbell,legs,weighted,single_leg
+Walking Lunge (Dumbbell),quadriceps,dumbbell,legs,weighted,single_leg
+Step Up,quadriceps,dumbbell,legs,weighted,single_leg
+Leg Curl (Lying),hamstrings,machine,legs,weighted,hinge
+Lying Leg Curl (Machine),hamstrings,machine,legs,weighted,hinge
+Leg Curl (Seated),hamstrings,machine,legs,weighted,hinge
+Seated Leg Curl (Machine),hamstrings,machine,legs,weighted,hinge
+Standing Leg Curl,hamstrings,machine,legs,weighted,hinge
+Romanian Deadlift (Barbell),hamstrings,barbell,legs,weighted,hinge
+Romanian Deadlift (Dumbbell),hamstrings,dumbbell,legs,weighted,hinge
+Stiff Leg Deadlift (Barbell),hamstrings,barbell,legs,weighted,hinge
+Good Morning (Barbell),hamstrings,barbell,legs,weighted,hinge
+Deadlift (Barbell),lower_back,barbell,pull,weighted,hinge
+Sumo Deadlift (Barbell),lower_back,barbell,pull,weighted,hinge
+Trap Bar Deadlift,lower_back,barbell,pull,weighted,hinge
+Hip Thrust (Barbell),glutes,barbell,legs,weighted,hinge
+Hip Thrust (Machine),glutes,machine,legs,weighted,hinge
+Glute Bridge,glutes,bodyweight,legs,bodyweight,hinge
+Cable Kickback,glutes,cable,legs,weighted,hinge
+Hip Abduction (Machine),abductors,machine,legs,weighted,squat
+Hip Adduction (Machine),adductors,machine,legs,weighted,squat
+Calf Raise (Standing),calves,machine,legs,weighted,squat
+Standing Calf Raise (Machine),calves,machine,legs,weighted,squat
+Calf Raise (Seated),calves,machine,legs,weighted,squat
+Seated Calf Raise,calves,machine,legs,weighted,squat
+Calf Press (Leg Press),calves,machine,legs,weighted,squat
+Lat Pulldown (Cable),lats,cable,pull,weighted,vertical_pull
+Lat Pulldown (Machine),lats,machine,pull,weighted,vertical_pull
+Lat Pulldown - Close Grip,lats,cable,pull,weighted,vertical_pull
+Lat Pulldown - Wide Grip,lats,cable,pull,weighted,vertical_pull
+Straight Arm Pulldown (Cable),lats,cable,pull,weighted,vertical_pull
+Pull Up,lats,bodyweight,pull,bodyweight,vertical_pull
+Pull Up (Assisted),lats,machine,pull,assisted,vertical_pull
+Pull Up (Weighted),lats,bodyweight,pull,bodyweight,vertical_pull
+Chin Up,biceps,bodyweight,pull,bodyweight,vertical_pull
+Chin Up (Assisted),biceps,machine,pull,assisted,vertical_pull
+Seated Row (Cable),upper_back,cable,pull,weighted,horizontal_pull
+Seated Row (Machine),upper_back,machine,pull,weighted,horizontal_pull
+Seated Cable Row - V Grip (Cable),upper_back,cable,pull,weighted,horizontal_pull
+Seated Cable Row - Bar Grip,upper_back,cable,pull,weighted,horizontal_pull
+Seated Cable Row - Wide Grip (Cable),upper_back,cable,pull,weighted,horizontal_pull
+Iso-Lateral Low Row,upper_back,machine,pull,weighted,horizontal_pull
+Iso-Lateral High Row,upper_back,machine,pull,weighted,horizontal_pull
+Chest Supported Row (Machine),upper_back,machine,pull,weighted,horizontal_pull
+Bent Over Row (Barbell),upper_back,barbell,pull,weighted,horizontal_pull
+Bent Over Row (Dumbbell),upper_back,dumbbell,pull,weighted,horizontal_pull
+Dumbbell Row,upper_back,dumbbell,pull,weighted,horizontal_pull
+T-Bar Row,upper_back,barbell,pull,weighted,horizontal_pull
+Pendlay Row (Barbell),upper_back,barbell,pull,weighted,horizontal_pull
+Face Pull (Cable),upper_back,cable,pull,weighted,horizontal_pull
+Reverse Fly (Dumbbell),upper_back,dumbbell,pull,weighted,horizontal_pull
+Reverse Fly (Cable),upper_back,cable,pull,weighted,horizontal_pull
+Rear Delt Reverse Fly (Machine),upper_back,machine,pull,weighted,horizontal_pull
+Shrug (Barbell),traps,barbell,pull,weighted,vertical_pull
+Shrug (Dumbbell),traps,dumbbell,pull,weighted,vertical_pull
+Shrug (Machine),traps,machine,pull,weighted,vertical_pull
+Upright Row (Barbell),traps,barbell,pull,weighted,vertical_pull
+Upright Row (Dumbbell),traps,dumbbell,pull,weighted,vertical_pull
+Upright Row (Cable),traps,cable,pull,weighted,vertical_pull
+Bicep Curl (Barbell),biceps,barbell,pull,weighted,horizontal_pull
+Bicep Curl (Dumbbell),biceps,dumbbell,pull,weighted,horizontal_pull
+Bicep Curl (Cable),biceps,cable,pull,weighted,horizontal_pull
+Bicep Curl (Machine),biceps,machine,pull,weighted,horizontal_pull
+Seated Incline Curl (Dumbbell),biceps,dumbbell,pull,weighted,horizontal_pull
+Concentration Curl,biceps,dumbbell,pull,weighted,horizontal_pull
+Hammer Curl (Dumbbell),biceps,dumbbell,pull,weighted,horizontal_pull
+Hammer Curl (Cable),biceps,cable,pull,weighted,horizontal_pull
+Preacher Curl,biceps,machine,pull,weighted,horizontal_pull
+Preacher Curl (Barbell),biceps,barbell,pull,weighted,horizontal_pull
+Preacher Curl (Dumbbell),biceps,dumbbell,pull,weighted,horizontal_pull
+Preacher Curl (Machine),biceps,machine,pull,weighted,horizontal_pull
+EZ Bar Curl,biceps,barbell,pull,weighted,horizontal_pull
+Reverse Curl (Barbell),forearms,barbell,pull,weighted,horizontal_pull
+Wrist Curl (Barbell),forearms,barbell,pull,weighted,horizontal_pull
+Plank,abdominals,bodyweight,core,bodyweight,core
+Side Plank,abdominals,bodyweight,core,bodyweight,core
+Hanging Leg Raise,abdominals,bodyweight,core,bodyweight,core
+Hanging Knee Raise,abdominals,bodyweight,core,bodyweight,core
+Cable Crunch,abdominals,cable,core,weighted,core
+Ab Wheel Rollout,abdominals,bodyweight,core,bodyweight,core
+Russian Twist,abdominals,bodyweight,core,bodyweight,core
+Sit Up,abdominals,bodyweight,core,bodyweight,core
+Crunch,abdominals,bodyweight,core,bodyweight,core
+Decline Crunch,abdominals,bodyweight,core,bodyweight,core
+Bicycle Crunch,abdominals,bodyweight,core,bodyweight,core
+Mountain Climber,abdominals,bodyweight,core,bodyweight,core
+Treadmill,cardio,machine,cardio,cardio,cardio
+Stationary Bike,cardio,machine,cardio,cardio,cardio
+Rowing Machine,cardio,machine,cardio,cardio,cardio
+Stair Master,cardio,machine,cardio,cardio,cardio
+Stair Climber,cardio,machine,cardio,cardio,cardio
+Elliptical,cardio,machine,cardio,cardio,cardio
+Running,cardio,none,cardio,cardio,cardio
+Walking,cardio,none,cardio,cardio,cardio
+Cycling,cardio,none,cardio,cardio,cardio
+Stretching,full_body,none,mobility,mobility,mobility
+Foam Rolling,full_body,none,mobility,mobility,mobility
+Yoga,full_body,none,mobility,mobility,mobility
+Single Arm Tricep Extension (Dumbbell),triceps,dumbbell,push,weighted,horizontal_push
+Single Arm Triceps Extension (Dumbbell),triceps,dumbbell,push,weighted,horizontal_push
+Face Pull,upper_back,cable,pull,weighted,horizontal_pull
+Single Arm Lateral Raise (Cable),shoulders,cable,push,weighted,vertical_push
+Decline Crunch (Weighted),abdominals,bodyweight,core,weighted,core
+T Bar Row,upper_back,barbell,pull,weighted,horizontal_pull
+Behind Back Cable Curl,biceps,cable,pull,weighted,horizontal_pull
+Overhead Press (Cable),shoulders,cable,push,weighted,vertical_push
+Lat Pulldown - Close Grip (Cable),lats,cable,pull,weighted,vertical_pull
+Lat Pulldown - Wide Grip (Cable),lats,cable,pull,weighted,vertical_pull
+Seated Triceps Press,triceps,machine,push,weighted,horizontal_push
+Seated Dip Machine,triceps,machine,push,weighted,horizontal_push
+iso-lateral shoulder press,shoulders,machine,push,weighted,vertical_push
+Iso-Lateral Shoulder Press (Machine),shoulders,machine,push,weighted,vertical_push
+Single Leg Press (Machine),quadriceps,machine,legs,weighted,single_leg
+Stair Machine (Steps),cardio,machine,cardio,cardio,cardio
+Russian Twist (Bodyweight),abdominals,bodyweight,core,bodyweight,core
+Russian Twist (Weighted),abdominals,bodyweight,core,weighted,core
+Low Cable Fly Crossovers,chest,cable,push,weighted,horizontal_push
+Standing Calf Raise (Dumbbell),calves,dumbbell,legs,weighted,squat
+Iso-Lateral Row (Machine),upper_back,machine,pull,weighted,horizontal_pull
+Reverse Grip Lat Pulldown (Cable),biceps,cable,pull,weighted,vertical_pull
+iso-lateral super incline press,chest,machine,push,weighted,horizontal_push
+Iso-Lateral Incline Press (Machine),chest,machine,push,weighted,horizontal_push
+Iso-Lateral Chest Press (Machine),chest,machine,push,weighted,horizontal_push
+Single Arm Cable Row,upper_back,cable,pull,weighted,horizontal_pull
+Single Arm Pulldown (Cable),lats,cable,pull,weighted,vertical_pull
+Cable Crunch (Kneeling),abdominals,cable,core,weighted,core
+Crunch (Weighted),abdominals,bodyweight,core,weighted,core
+Sit Up (Weighted),abdominals,bodyweight,core,weighted,core
+Pec Deck,chest,machine,push,weighted,horizontal_push
