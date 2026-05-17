@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+*.egg-info/
+
+# Data — keep lookups + sample committed, ignore real exports and derived files
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+*.parquet
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Local-only screenshots (full-data variant); public set lives in docs/screenshots/
+scripts/screenshots/
+
+# Local dev / diagnostic scripts that hard-code personal CSV filenames
+scripts/diagnose_*.py
+scripts/test_*.py
+scripts/calendar_test.html
+
+# Playwright cache (optional dev dep)
+.playwright/

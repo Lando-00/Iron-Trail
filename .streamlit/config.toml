@@ -1,0 +1,15 @@
+[theme]
+base = "dark"
+primaryColor = "#d4a843"
+backgroundColor = "#0a0a0c"
+secondaryBackgroundColor = "#15151a"
+textColor = "#e7e7e9"
+
+[server]
+runOnSave = true
+# Bind to localhost only — prevents broadcasting on the LAN.
+# Remove or set to "0.0.0.0" if you want devices on your network to access it.
+address = "localhost"
+
+[browser]
+gatherUsageStats = false

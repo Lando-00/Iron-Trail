@@ -1,0 +1,29 @@
+[project]
+name = "iron-trail"
+version = "0.2.0"
+description = "Personal Hevy gym dashboard + AI training coach"
+requires-python = ">=3.11"
+dependencies = [
+    "streamlit>=1.35",
+    "pandas>=2.2",
+    "plotly>=5.20",
+    "dateparser>=1.2",
+    "numpy>=1.26",
+    "pyarrow>=17.0",
+    "scikit-learn>=1.4",
+]
+
+[project.optional-dependencies]
+dev = ["ruff>=0.4", "pytest>=8.0", "playwright>=1.50"]
+ai = ["openai>=1.30"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["iron_trail*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
