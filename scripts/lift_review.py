@@ -6,9 +6,9 @@ Streamlit Save-to-Vault button.
 
 Examples::
 
-    python scripts/lift_review.py --vault D:/Dev/Quartz/Vault
-    python scripts/lift_review.py --vault D:/Dev/Quartz/Vault --monthly
-    python scripts/lift_review.py --vault D:/Dev/Quartz/Vault --personality goggins
+    python scripts/lift_review.py --vault C:/path/to/ObsidianVault
+    python scripts/lift_review.py --vault C:/path/to/ObsidianVault --monthly
+    python scripts/lift_review.py --vault C:/path/to/ObsidianVault --personality goggins
 """
 from __future__ import annotations
 

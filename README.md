@@ -212,9 +212,9 @@ The extension is **optional** — the Streamlit Coach page works without
 it. If you want the slash command:
 
 ```powershell
-# clone iron-trail to D:\Dev\iron-trail  (or wherever — see env vars below)
-git clone https://github.com/Lando-00/Iron-Trail.git D:\Dev\iron-trail
-cd D:\Dev\iron-trail
+# Clone wherever you keep projects
+git clone https://github.com/Lando-00/Iron-Trail.git "$HOME\iron-trail"
+cd "$HOME\iron-trail"
 python -m venv .venv ; .\.venv\Scripts\Activate.ps1 ; pip install -r requirements.txt
 
 # install the extension (Windows)
@@ -226,7 +226,7 @@ Copy-Item -Recurse extensions\lift-trail $env:USERPROFILE\.copilot\extensions\
 Environment variables (set in your shell profile, all optional):
 
 ```
-IRON_TRAIL_REPO   = D:/Dev/iron-trail            # default
+IRON_TRAIL_REPO   = ~/iron-trail                  # default
 IRON_TRAIL_VAULT  = <repo>/vault-output          # default
 IRON_TRAIL_VENV   = <repo>/.venv                 # default
 ```

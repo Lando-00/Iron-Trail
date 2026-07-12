@@ -11,7 +11,7 @@
 //   /lift-review --vault <path>            — override the vault dir
 //
 // Configuration via environment variables (set in your shell profile):
-//   IRON_TRAIL_REPO   — path to the iron-trail repo (default: D:/Dev/iron-trail)
+//   IRON_TRAIL_REPO   — path to the iron-trail repo (default: ~/iron-trail)
 //   IRON_TRAIL_VAULT  — default vault directory (fallback: <repo>/vault-output)
 //   IRON_TRAIL_VENV   — venv path (default: <repo>/.venv on Win, <repo>/.venv on *nix)
 //
@@ -19,6 +19,7 @@
 
 import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { joinSession } from "@github/copilot-sdk/extension";
 
@@ -28,7 +29,7 @@ import { joinSession } from "@github/copilot-sdk/extension";
 
 const IRON_TRAIL_REPO =
     process.env.IRON_TRAIL_REPO ||
-    (process.platform === "win32" ? "D:/Dev/iron-trail" : `${process.env.HOME}/iron-trail`);
+    join(homedir(), "iron-trail");
 
 const IRON_TRAIL_VAULT =
     process.env.IRON_TRAIL_VAULT || join(IRON_TRAIL_REPO, "vault-output");

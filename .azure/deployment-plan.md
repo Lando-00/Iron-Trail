@@ -525,13 +525,16 @@ to `Validated`.
 | Check | Command run | Result | Timestamp |
 |---|---|---|---|
 | Python lint | `ruff check .` | Pass | 2026-07-12 |
-| Python tests | `python -m pytest -q` | 28 passed | 2026-07-12 |
+| Python tests | `python -m pytest -q` | 34 passed | 2026-07-12 |
 | Container build | `docker build -t irontrail:stage-a .` | Pass | 2026-07-12 |
-| Container health | `/_stcore/health` and `/` | HTTP 200 | 2026-07-12 |
-| Cloud image isolation | Non-root UID; no `copilot` package | Pass | 2026-07-12 |
+| Container health | Port 80 `/` and `/_stcore/health` | HTTP 200 | 2026-07-12 |
+| Cloud image isolation | Non-root UID 10001; no `copilot` package | Pass | 2026-07-12 |
+| Deployment architecture | AZD remote build targeting `amd64` | Schema pass | 2026-07-12 |
 | Bicep compilation | `az bicep build --file infra/main.bicep` | Pass | 2026-07-12 |
 | Azure template validation | `az deployment sub validate` with dummy auth values | Succeeded; no resources created | 2026-07-12 |
 | AZD schema | `azd show --output json --no-prompt` | Pass | 2026-07-12 |
+| Independent code review | Two review passes over auth, storage, AI limits, HTML, telemetry, container, and IaC | All findings resolved | 2026-07-12 |
+| Privacy boundary | Raw data absent; Samsung code excluded; no introduced personal paths or credentials | Pass | 2026-07-12 |
 
 ---
 
