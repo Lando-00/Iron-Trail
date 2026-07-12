@@ -13,7 +13,8 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from . import config, ingest
+from . import auth, config, ingest, runtime
+from .cloud_storage import CloudStorageError, DatasetRecord, get_dataset_repository
 
 
 def _csv_choices() -> list[str]:
@@ -29,14 +30,23 @@ def _load_from_path(path: str, body_weight_kg: float) -> pd.DataFrame:
     return ingest.load_and_clean(Path(path), body_weight_kg=body_weight_kg)
 
 
-@st.cache_data(show_spinner="Parsing Hevy CSV…")
 def _load_from_bytes(content: bytes, _filename: str, body_weight_kg: float) -> pd.DataFrame:
-    """Cache-keyed on `content` + `_filename` so re-uploading the same file is a cache hit."""
+    """Parse uploaded bytes without placing private data in Streamlit's global cache."""
     return ingest.load_and_clean(io.BytesIO(content), body_weight_kg=body_weight_kg)
 
 
 def render_data_source() -> tuple[pd.DataFrame, str, float]:
     """Render the IronTrail sidebar. Returns (df, source_label, body_weight_kg)."""
+    if runtime.is_cloud():
+        try:
+            return _render_cloud_data_source()
+        except (CloudStorageError, runtime.ConfigurationError) as exc:
+            st.error(str(exc))
+            st.stop()
+    return _render_local_data_source()
+
+
+def _render_local_data_source() -> tuple[pd.DataFrame, str, float]:
     st.markdown("### 🏋️ IronTrail")
     st.caption("Personal training dashboard")
     st.divider()
@@ -46,7 +56,8 @@ def render_data_source() -> tuple[pd.DataFrame, str, float]:
         type=["csv"],
         help=(
             "In the Hevy app: **Profile → Settings → Export Workout Data**. "
-            "Drop the CSV here — it stays in browser memory, never written to disk. "
+            "The CSV is processed in this local Streamlit session and is not uploaded "
+            "to a third-party service. "
             "Persists across pages within the session."
         ),
         key="csv_upload_widget",
@@ -98,3 +109,137 @@ def render_data_source() -> tuple[pd.DataFrame, str, float]:
         label = Path(selected).name
 
     return df, label, body_weight
+
+
+def _render_cloud_data_source() -> tuple[pd.DataFrame, str, float]:
+    user = auth.current_user()
+    repository = get_dataset_repository()
+
+    st.markdown("### IronTrail")
+    st.caption("Private training dashboard")
+    auth.render_account_controls(user)
+    st.divider()
+
+    uploaded = st.file_uploader(
+        "Upload a Hevy CSV",
+        type=["csv"],
+        help=(
+            "The file is sent to the IronTrail server for this session. It is stored in "
+            "Azure only when you explicitly choose Save privately."
+        ),
+        key="csv_upload_widget",
+    )
+    if uploaded is not None:
+        st.session_state["it_upload_bytes"] = uploaded.getvalue()
+        st.session_state["it_upload_name"] = uploaded.name
+
+    has_upload = bool(st.session_state.get("it_upload_bytes"))
+    if has_upload:
+        st.success(f"Using **{st.session_state['it_upload_name']}**")
+        if st.button("Clear session upload", use_container_width=True):
+            for key in (
+                "it_upload_bytes",
+                "it_upload_name",
+                "csv_upload_widget",
+                "it_saved_upload_id",
+            ):
+                st.session_state.pop(key, None)
+            st.rerun()
+
+    body_weight = st.number_input(
+        "Bodyweight (kg)",
+        value=float(config.BODY_WEIGHT_KG),
+        step=0.5,
+        min_value=30.0,
+        help="Used for bodyweight exercises and relative-strength achievements.",
+    )
+
+    if has_upload:
+        content = st.session_state["it_upload_bytes"]
+        filename = st.session_state["it_upload_name"]
+        df = _load_from_bytes(content, filename, body_weight)
+        label = f"Session upload: {filename}"
+
+        persist = st.checkbox(
+            "Save privately",
+            value=False,
+            help=(
+                "Raw upload expires after 30 days. Normalized workout data expires "
+                "after 60 days."
+            ),
+        )
+        if persist and st.button("Save this dataset", type="primary", use_container_width=True):
+            try:
+                record = repository.save_hevy_dataset(
+                    user.user_id,
+                    content,
+                    filename,
+                    df,
+                )
+            except CloudStorageError as exc:
+                st.error(str(exc))
+            else:
+                st.session_state["it_saved_upload_id"] = record.dataset_id
+                st.success("Saved privately with automatic expiry.")
+    else:
+        records = repository.list_datasets(user.user_id)
+        choices: list[DatasetRecord | None] = [None, *records]
+        selected = st.selectbox(
+            "Dataset",
+            choices,
+            format_func=lambda record: (
+                "Synthetic sample"
+                if record is None
+                else f"{record.filename} ({record.created_at:%Y-%m-%d})"
+            ),
+        )
+        if selected is None:
+            df = ingest.load_and_clean(config.SAMPLE_CSV, body_weight_kg=body_weight)
+            label = config.SAMPLE_CSV.name
+        else:
+            df = repository.load_dataset(user.user_id, selected.dataset_id)
+            label = selected.filename
+
+    _render_cloud_data_controls(user.user_id, repository)
+    return df, label, body_weight
+
+
+def _render_cloud_data_controls(user_id: str, repository) -> None:
+    with st.expander("My saved data"):
+        records = repository.list_datasets(user_id)
+        if not records:
+            st.caption("No cloud datasets saved.")
+            return
+
+        selected = st.selectbox(
+            "Manage dataset",
+            records,
+            format_func=lambda record: f"{record.filename} ({record.created_at:%Y-%m-%d})",
+            key="manage_cloud_dataset",
+        )
+        st.caption(
+            f"Raw expires {selected.raw_expires_at:%Y-%m-%d}; "
+            f"normalized data expires {selected.normalized_expires_at:%Y-%m-%d}."
+        )
+        if st.button("Delete selected dataset", key="delete_cloud_dataset"):
+            repository.delete_dataset(user_id, selected.dataset_id)
+            st.rerun()
+
+        archive = repository.export_user_archive(user_id)
+        st.download_button(
+            "Download all saved data",
+            data=archive,
+            file_name="irontrail-data-export.zip",
+            mime="application/zip",
+            use_container_width=True,
+        )
+
+        confirm = st.checkbox("I understand this deletes all saved datasets.")
+        if st.button(
+            "Delete all saved data",
+            disabled=not confirm,
+            key="delete_all_cloud_data",
+            use_container_width=True,
+        ):
+            repository.delete_all(user_id)
+            st.rerun()

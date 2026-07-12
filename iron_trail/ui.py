@@ -409,6 +409,9 @@ def setup_page(title: str, icon: str, *, layout: str = "wide") -> None:
     """Page-config + theme + CSS in one call. Call once at the top of every page."""
     st.set_page_config(page_title=title, page_icon=icon, layout=layout)
     st.markdown(_CSS, unsafe_allow_html=True)
+    from .auth import require_invited_user
+
+    require_invited_user()
 
 
 def mini_metric(label: str, value: str, unit: str = "", sub: str = "") -> None:
