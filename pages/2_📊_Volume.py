@@ -79,11 +79,11 @@ else:
 
         avg_ratio = plot_pp["push_pull_ratio"].mean()
         if 0.9 <= avg_ratio <= 1.3:
-            ui.callout("success", f"Average push:pull ratio over this window: <strong>{avg_ratio:.2f}</strong> — well balanced.")
+            ui.callout("success", f"Average push:pull ratio over this window: {avg_ratio:.2f} — well balanced.")
         elif avg_ratio < 0.9:
-            ui.callout("warning", f"Average push:pull ratio: <strong>{avg_ratio:.2f}</strong>. Pull volume lags — add rows / pulldowns / curls.")
+            ui.callout("warning", f"Average push:pull ratio: {avg_ratio:.2f}. Pull volume lags — add rows / pulldowns / curls.")
         else:
-            ui.callout("info", f"Average push:pull ratio: <strong>{avg_ratio:.2f}</strong>. Pull-heavy — common for postural correction, fine if intentional.")
+            ui.callout("info", f"Average push:pull ratio: {avg_ratio:.2f}. Pull-heavy — common for postural correction, fine if intentional.")
 
 ui.section_title("Movement Radar — last 12 weeks")
 radar = analytics.movement_radar_data(df, weeks_back=12)
@@ -120,5 +120,8 @@ else:
 
     neglected = radar[radar["sets_per_week"] < 4].sort_values("sets_per_week")
     if not neglected.empty:
-        neglected_text = ", ".join([f"<strong>{r['label']}</strong> ({r['sets_per_week']:.1f}/wk)" for _, r in neglected.iterrows()])
+        neglected_text = ", ".join(
+            f"{row['label']} ({row['sets_per_week']:.1f}/wk)"
+            for _, row in neglected.iterrows()
+        )
         ui.callout("warning", f"Under 4 sets/week (typical minimum effective volume): {neglected_text}")

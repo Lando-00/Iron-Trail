@@ -173,7 +173,7 @@ if not significant:
 else:
     for p in significant[:3]:
         kind = "warning" if p.status == "regressing" else "gold"
-        ui.callout(kind, f"<strong>{p.exercise}</strong> — {p.message}")
+        ui.callout(kind, f"{p.exercise} — {p.message}")
     remaining = len(significant) - 3
     if remaining > 0:
         st.caption(f"+ {remaining} more plateau{'s' if remaining > 1 else ''} flagged. See **Strength** page per-exercise.")

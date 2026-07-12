@@ -16,5 +16,10 @@ def test_telemetry_configures_named_logger_once(monkeypatch) -> None:
         {"APPLICATIONINSIGHTS_CONNECTION_STRING": "InstrumentationKey=test"},
         configurator=lambda **kwargs: calls.append(kwargs),
     )
-    assert calls == [{"logger_name": "iron_trail"}]
-
+    assert calls[0]["logger_name"] == "iron_trail"
+    assert calls[0]["disable_offline_storage"] is True
+    assert calls[0]["enable_live_metrics"] is False
+    assert all(
+        option["enabled"] is False
+        for option in calls[0]["instrumentation_options"].values()
+    )

@@ -5,7 +5,7 @@ import os
 import threading
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 from typing import Any, Protocol
 
@@ -15,7 +15,7 @@ from . import runtime
 from .cloud_storage import azure_table_client
 from .coach.providers import Message, Provider, TokenUsage
 
-_RESERVATION_LOCK = threading.Lock()
+_USAGE_STATE_ROW = "state"
 
 
 class CallKind(StrEnum):
@@ -42,6 +42,7 @@ class UsagePolicy:
     global_monthly_cost_eur: float = 10.0
     input_eur_per_million: float = 0.25
     output_eur_per_million: float = 2.0
+    reservation_ttl_seconds: int = 900
 
     @classmethod
     def from_environment(cls) -> "UsagePolicy":
@@ -69,6 +70,9 @@ class UsagePolicy:
             output_eur_per_million=runtime.env_float(
                 "IRONTRAIL_AI_OUTPUT_EUR_PER_MILLION", 2.0, minimum=0.0
             ),
+            reservation_ttl_seconds=runtime.env_int(
+                "IRONTRAIL_AI_RESERVATION_TTL_SECONDS", 900, minimum=300
+            ),
         )
 
 
@@ -84,6 +88,7 @@ class UsageEvent:
     output_tokens: int
     cost_eur: float
     created_at: datetime
+    expires_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -96,13 +101,25 @@ class UsageSnapshot:
 
 
 class UsageRepository(Protocol):
-    def list_month(self, month: str) -> list[UsageEvent]: ...
+    def reserve(
+        self,
+        event: UsageEvent,
+        *,
+        policy: UsagePolicy,
+        now: datetime,
+    ) -> UsageEvent: ...
 
-    def create(self, event: UsageEvent) -> None: ...
+    def complete(
+        self,
+        reservation: UsageEvent,
+        usage: TokenUsage,
+        *,
+        policy: UsagePolicy,
+    ) -> UsageEvent: ...
 
-    def complete(self, event: UsageEvent) -> None: ...
+    def cancel(self, reservation: UsageEvent) -> None: ...
 
-    def cancel(self, event: UsageEvent) -> None: ...
+    def snapshot(self, user_id: str, current: date) -> UsageSnapshot: ...
 
 
 class AzureUsageRepository:
@@ -114,58 +131,277 @@ class AzureUsageRepository:
         table_name = os.environ.get("IRONTRAIL_USAGE_TABLE", "IronTrailUsage")
         return cls(azure_table_client(table_name))
 
-    def list_month(self, month: str) -> list[UsageEvent]:
+    def reserve(
+        self,
+        event: UsageEvent,
+        *,
+        policy: UsagePolicy,
+        now: datetime,
+    ) -> UsageEvent:
+        from azure.core import MatchConditions
+        from azure.core.exceptions import AzureError
+        from azure.data.tables import TableTransactionError, UpdateMode
+
+        for _ in range(6):
+            try:
+                state = self._get_or_create_state(event.month)
+                events = self._list_month(event.month)
+                active, expired = _partition_active(events, now)
+                _enforce_limits(active, event, policy)
+
+                state_update = dict(state)
+                state_update["version"] = int(state.get("version", 0)) + 1
+                operations: list[tuple] = [
+                    (
+                        "update",
+                        state_update,
+                        {
+                            "etag": _entity_etag(state),
+                            "match_condition": MatchConditions.IfNotModified,
+                            "mode": UpdateMode.REPLACE,
+                        },
+                    ),
+                    ("create", _event_to_entity(event)),
+                ]
+                operations.extend(
+                    ("delete", _event_to_entity(item)) for item in expired[:90]
+                )
+                self._table.submit_transaction(operations)
+                return event
+            except UsageLimitExceeded:
+                raise
+            except TableTransactionError as exc:
+                if getattr(exc, "status_code", None) not in {409, 412}:
+                    raise UsageRepositoryError("Unable to reserve AI usage.") from exc
+            except AzureError as exc:
+                if getattr(exc, "status_code", None) not in {409, 412}:
+                    raise UsageRepositoryError("Unable to reserve AI usage.") from exc
+        raise UsageRepositoryError("AI usage changed concurrently; retry the request.")
+
+    def complete(
+        self,
+        reservation: UsageEvent,
+        usage: TokenUsage,
+        *,
+        policy: UsagePolicy,
+    ) -> UsageEvent:
+        event = UsageEvent(
+            reservation_id=reservation.reservation_id,
+            month=reservation.month,
+            day=reservation.day,
+            user_id=reservation.user_id,
+            kind=reservation.kind,
+            status="completed",
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            cost_eur=token_cost_eur(usage.input_tokens, usage.output_tokens, policy),
+            created_at=reservation.created_at,
+        )
+        self._replace_event(reservation, event)
+        return event
+
+    def cancel(self, reservation: UsageEvent) -> None:
+        from azure.core import MatchConditions
+        from azure.core.exceptions import AzureError, ResourceNotFoundError
+        from azure.data.tables import TableTransactionError, UpdateMode
+
+        for _ in range(6):
+            try:
+                state = self._get_or_create_state(reservation.month)
+                stored = self._table.get_entity(
+                    reservation.month, reservation.reservation_id
+                )
+                if stored.get("status") == "completed":
+                    return
+                state_update = dict(state)
+                state_update["version"] = int(state.get("version", 0)) + 1
+                self._table.submit_transaction(
+                    [
+                        (
+                            "update",
+                            state_update,
+                            {
+                                "etag": _entity_etag(state),
+                                "match_condition": MatchConditions.IfNotModified,
+                                "mode": UpdateMode.REPLACE,
+                            },
+                        ),
+                        (
+                            "delete",
+                            stored,
+                            {
+                                "etag": _entity_etag(stored),
+                                "match_condition": MatchConditions.IfNotModified,
+                            },
+                        ),
+                    ]
+                )
+                return
+            except ResourceNotFoundError:
+                return
+            except TableTransactionError as exc:
+                if getattr(exc, "status_code", None) not in {409, 412}:
+                    raise UsageRepositoryError("Unable to release AI usage.") from exc
+            except AzureError as exc:
+                if getattr(exc, "status_code", None) not in {409, 412}:
+                    raise UsageRepositoryError("Unable to release AI usage.") from exc
+        raise UsageRepositoryError("Unable to release concurrent AI usage.")
+
+    def snapshot(self, user_id: str, current: date) -> UsageSnapshot:
+        now = datetime.now(UTC)
+        try:
+            events, _ = _partition_active(
+                self._list_month(current.strftime("%Y-%m")),
+                now,
+            )
+        except Exception as exc:
+            if isinstance(exc, UsageRepositoryError):
+                raise
+            raise UsageRepositoryError("Unable to read AI usage.") from exc
+        return _snapshot(events, user_id, current.isoformat())
+
+    def _replace_event(self, reservation: UsageEvent, completed: UsageEvent) -> None:
+        from azure.core import MatchConditions
+        from azure.core.exceptions import AzureError, ResourceNotFoundError
+        from azure.data.tables import TableTransactionError, UpdateMode
+
+        for _ in range(6):
+            try:
+                state = self._get_or_create_state(reservation.month)
+                stored = self._table.get_entity(
+                    reservation.month, reservation.reservation_id
+                )
+                if stored.get("status") == "completed":
+                    return
+                state_update = dict(state)
+                state_update["version"] = int(state.get("version", 0)) + 1
+                self._table.submit_transaction(
+                    [
+                        (
+                            "update",
+                            state_update,
+                            {
+                                "etag": _entity_etag(state),
+                                "match_condition": MatchConditions.IfNotModified,
+                                "mode": UpdateMode.REPLACE,
+                            },
+                        ),
+                        (
+                            "update",
+                            _event_to_entity(completed),
+                            {
+                                "etag": _entity_etag(stored),
+                                "match_condition": MatchConditions.IfNotModified,
+                                "mode": UpdateMode.REPLACE,
+                            },
+                        ),
+                    ]
+                )
+                return
+            except ResourceNotFoundError as exc:
+                raise UsageRepositoryError("AI reservation no longer exists.") from exc
+            except TableTransactionError as exc:
+                if getattr(exc, "status_code", None) not in {409, 412}:
+                    raise UsageRepositoryError("Unable to record AI usage.") from exc
+            except AzureError as exc:
+                if getattr(exc, "status_code", None) not in {409, 412}:
+                    raise UsageRepositoryError("Unable to record AI usage.") from exc
+        raise UsageRepositoryError("Unable to record concurrent AI usage.")
+
+    def _get_or_create_state(self, month: str) -> Any:
+        from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
+
+        try:
+            return self._table.get_entity(month, _USAGE_STATE_ROW)
+        except ResourceNotFoundError:
+            try:
+                self._table.create_entity(
+                    {
+                        "PartitionKey": month,
+                        "RowKey": _USAGE_STATE_ROW,
+                        "version": 0,
+                    }
+                )
+            except ResourceExistsError:
+                pass
+            return self._table.get_entity(month, _USAGE_STATE_ROW)
+
+    def _list_month(self, month: str) -> list[UsageEvent]:
         from azure.core.exceptions import AzureError
 
         try:
             entities = self._table.query_entities(f"PartitionKey eq '{month}'")
-            return [_entity_to_event(entity) for entity in entities]
+            return [
+                _entity_to_event(entity)
+                for entity in entities
+                if entity["RowKey"] != _USAGE_STATE_ROW
+            ]
         except AzureError as exc:
             raise UsageRepositoryError("Unable to read AI usage.") from exc
-
-    def create(self, event: UsageEvent) -> None:
-        from azure.core.exceptions import AzureError
-
-        try:
-            self._table.create_entity(_event_to_entity(event))
-        except AzureError as exc:
-            raise UsageRepositoryError("Unable to reserve AI usage.") from exc
-
-    def complete(self, event: UsageEvent) -> None:
-        from azure.core.exceptions import AzureError
-        from azure.data.tables import UpdateMode
-
-        try:
-            self._table.update_entity(_event_to_entity(event), mode=UpdateMode.REPLACE)
-        except AzureError as exc:
-            raise UsageRepositoryError("Unable to record AI usage.") from exc
-
-    def cancel(self, event: UsageEvent) -> None:
-        from azure.core.exceptions import AzureError, ResourceNotFoundError
-
-        try:
-            self._table.delete_entity(event.month, event.reservation_id)
-        except ResourceNotFoundError:
-            return
-        except AzureError as exc:
-            raise UsageRepositoryError("Unable to release AI usage.") from exc
 
 
 class InMemoryUsageRepository:
     def __init__(self) -> None:
         self.events: dict[str, UsageEvent] = {}
+        self._lock = threading.Lock()
 
-    def list_month(self, month: str) -> list[UsageEvent]:
-        return [event for event in self.events.values() if event.month == month]
+    def reserve(
+        self,
+        event: UsageEvent,
+        *,
+        policy: UsagePolicy,
+        now: datetime,
+    ) -> UsageEvent:
+        with self._lock:
+            active, expired = _partition_active(list(self.events.values()), now)
+            for item in expired:
+                self.events.pop(item.reservation_id, None)
+            _enforce_limits(active, event, policy)
+            self.events[event.reservation_id] = event
+            return event
 
-    def create(self, event: UsageEvent) -> None:
-        self.events[event.reservation_id] = event
+    def complete(
+        self,
+        reservation: UsageEvent,
+        usage: TokenUsage,
+        *,
+        policy: UsagePolicy,
+    ) -> UsageEvent:
+        with self._lock:
+            event = UsageEvent(
+                reservation_id=reservation.reservation_id,
+                month=reservation.month,
+                day=reservation.day,
+                user_id=reservation.user_id,
+                kind=reservation.kind,
+                status="completed",
+                input_tokens=usage.input_tokens,
+                output_tokens=usage.output_tokens,
+                cost_eur=token_cost_eur(
+                    usage.input_tokens,
+                    usage.output_tokens,
+                    policy,
+                ),
+                created_at=reservation.created_at,
+            )
+            self.events[event.reservation_id] = event
+            return event
 
-    def complete(self, event: UsageEvent) -> None:
-        self.events[event.reservation_id] = event
+    def cancel(self, reservation: UsageEvent) -> None:
+        with self._lock:
+            self.events.pop(reservation.reservation_id, None)
 
-    def cancel(self, event: UsageEvent) -> None:
-        self.events.pop(event.reservation_id, None)
+    def snapshot(self, user_id: str, current: date) -> UsageSnapshot:
+        with self._lock:
+            active, _ = _partition_active(
+                [
+                    event
+                    for event in self.events.values()
+                    if event.month == current.strftime("%Y-%m")
+                ],
+                datetime.now(UTC),
+            )
+            return _snapshot(active, user_id, current.isoformat())
 
 
 class UsageLimiter:
@@ -186,98 +422,45 @@ class UsageLimiter:
         kind: CallKind,
         *,
         input_tokens: int,
+        hold_seconds: int | None = None,
     ) -> UsageEvent:
         if input_tokens > self.policy.max_input_tokens:
             raise UsageLimitExceeded("This request is too large for the hosted Coach.")
-
         now = self.clock()
-        month = now.strftime("%Y-%m")
-        day = now.date().isoformat()
-        estimated_cost = token_cost_eur(
-            input_tokens,
-            self.policy.max_output_tokens,
-            self.policy,
-        )
-
-        with _RESERVATION_LOCK:
-            events = [
-                event
-                for event in self.repository.list_month(month)
-                if event.status in {"reserved", "completed"}
-            ]
-            snapshot = _snapshot(events, user_id, day)
-            daily_limit, monthly_limit = self._limits(kind)
-            daily_count = (
-                snapshot.review_daily if kind is CallKind.REVIEW else snapshot.chat_daily
-            )
-            monthly_count = (
-                snapshot.review_monthly
-                if kind is CallKind.REVIEW
-                else snapshot.chat_monthly
-            )
-            if daily_count >= daily_limit:
-                raise UsageLimitExceeded("Your daily Coach allowance has been reached.")
-            if monthly_count >= monthly_limit:
-                raise UsageLimitExceeded("Your monthly Coach allowance has been reached.")
-            if (
-                snapshot.global_monthly_cost_eur + estimated_cost
-                > self.policy.global_monthly_cost_eur
-            ):
-                raise UsageLimitExceeded(
-                    "The IronTrail Coach monthly budget has been reached."
-                )
-
-            event = UsageEvent(
-                reservation_id=uuid.uuid4().hex,
-                month=month,
-                day=day,
-                user_id=user_id,
-                kind=kind,
-                status="reserved",
-                input_tokens=input_tokens,
-                output_tokens=self.policy.max_output_tokens,
-                cost_eur=estimated_cost,
-                created_at=now,
-            )
-            self.repository.create(event)
-            return event
-
-    def complete(self, reservation: UsageEvent, usage: TokenUsage) -> UsageEvent:
         event = UsageEvent(
-            reservation_id=reservation.reservation_id,
-            month=reservation.month,
-            day=reservation.day,
-            user_id=reservation.user_id,
-            kind=reservation.kind,
-            status="completed",
-            input_tokens=usage.input_tokens,
-            output_tokens=usage.output_tokens,
+            reservation_id=uuid.uuid4().hex,
+            month=now.strftime("%Y-%m"),
+            day=now.date().isoformat(),
+            user_id=user_id,
+            kind=kind,
+            status="reserved",
+            input_tokens=input_tokens,
+            output_tokens=self.policy.max_output_tokens,
             cost_eur=token_cost_eur(
-                usage.input_tokens,
-                usage.output_tokens,
+                input_tokens,
+                self.policy.max_output_tokens,
                 self.policy,
             ),
-            created_at=reservation.created_at,
+            created_at=now,
+            expires_at=now
+            + timedelta(
+                seconds=max(
+                    self.policy.reservation_ttl_seconds,
+                    hold_seconds or 0,
+                )
+            ),
         )
-        self.repository.complete(event)
-        return event
+        return self.repository.reserve(event, policy=self.policy, now=now)
+
+    def complete(self, reservation: UsageEvent, usage: TokenUsage) -> UsageEvent:
+        return self.repository.complete(reservation, usage, policy=self.policy)
 
     def cancel(self, reservation: UsageEvent) -> None:
         self.repository.cancel(reservation)
 
     def snapshot(self, user_id: str, today: date | None = None) -> UsageSnapshot:
         current = today or self.clock().date()
-        events = [
-            event
-            for event in self.repository.list_month(current.strftime("%Y-%m"))
-            if event.status in {"reserved", "completed"}
-        ]
-        return _snapshot(events, user_id, current.isoformat())
-
-    def _limits(self, kind: CallKind) -> tuple[int, int]:
-        if kind is CallKind.REVIEW:
-            return self.policy.review_daily, self.policy.review_monthly
-        return self.policy.chat_daily, self.policy.chat_monthly
+        return self.repository.snapshot(user_id, current)
 
 
 class LimitedProvider:
@@ -301,6 +484,7 @@ class LimitedProvider:
             self.user_id,
             self.kind,
             input_tokens=input_tokens,
+            hold_seconds=max(300, int(timeout) + 60),
         )
         try:
             response = self.provider.chat(messages, timeout=timeout)
@@ -324,7 +508,7 @@ def get_usage_repository() -> AzureUsageRepository:
 
 def estimate_tokens(messages: list[Message]) -> int:
     characters = sum(len(message.content) for message in messages)
-    return max(1, characters // 4 + len(messages) * 8)
+    return max(1, characters // 3 + len(messages) * 12)
 
 
 def token_cost_eur(input_tokens: int, output_tokens: int, policy: UsagePolicy) -> float:
@@ -332,6 +516,56 @@ def token_cost_eur(input_tokens: int, output_tokens: int, policy: UsagePolicy) -
         input_tokens * policy.input_eur_per_million
         + output_tokens * policy.output_eur_per_million
     ) / 1_000_000
+
+
+def _enforce_limits(
+    active: list[UsageEvent],
+    candidate: UsageEvent,
+    policy: UsagePolicy,
+) -> None:
+    snapshot = _snapshot(active, candidate.user_id, candidate.day)
+    daily_limit, monthly_limit = (
+        (policy.review_daily, policy.review_monthly)
+        if candidate.kind is CallKind.REVIEW
+        else (policy.chat_daily, policy.chat_monthly)
+    )
+    daily_count = (
+        snapshot.review_daily
+        if candidate.kind is CallKind.REVIEW
+        else snapshot.chat_daily
+    )
+    monthly_count = (
+        snapshot.review_monthly
+        if candidate.kind is CallKind.REVIEW
+        else snapshot.chat_monthly
+    )
+    if daily_count >= daily_limit:
+        raise UsageLimitExceeded("Your daily Coach allowance has been reached.")
+    if monthly_count >= monthly_limit:
+        raise UsageLimitExceeded("Your monthly Coach allowance has been reached.")
+    if (
+        snapshot.global_monthly_cost_eur + candidate.cost_eur
+        > policy.global_monthly_cost_eur
+    ):
+        raise UsageLimitExceeded("The IronTrail Coach monthly budget has been reached.")
+
+
+def _partition_active(
+    events: list[UsageEvent],
+    now: datetime,
+) -> tuple[list[UsageEvent], list[UsageEvent]]:
+    active: list[UsageEvent] = []
+    expired: list[UsageEvent] = []
+    for event in events:
+        if (
+            event.status == "reserved"
+            and event.expires_at is not None
+            and event.expires_at <= now
+        ):
+            expired.append(event)
+        elif event.status in {"reserved", "completed"}:
+            active.append(event)
+    return active, expired
 
 
 def _snapshot(events: list[UsageEvent], user_id: str, day: str) -> UsageSnapshot:
@@ -353,21 +587,21 @@ def _event_to_entity(event: UsageEvent) -> dict[str, Any]:
     return {
         "PartitionKey": event.month,
         "RowKey": event.reservation_id,
-        "day": event.day,
-        "userId": event.user_id,
-        "kind": event.kind.value,
-        "status": event.status,
-        "inputTokens": event.input_tokens,
-        "outputTokens": event.output_tokens,
         "costEur": event.cost_eur,
         "createdAt": event.created_at,
+        "day": event.day,
+        "expiresAt": event.expires_at,
+        "inputTokens": event.input_tokens,
+        "kind": event.kind.value,
+        "outputTokens": event.output_tokens,
+        "status": event.status,
+        "userId": event.user_id,
     }
 
 
 def _entity_to_event(entity: Any) -> UsageEvent:
-    created_at = entity["createdAt"]
-    if created_at.tzinfo is None:
-        created_at = created_at.replace(tzinfo=UTC)
+    created_at = _as_utc(entity["createdAt"])
+    expires_at = entity.get("expiresAt")
     return UsageEvent(
         reservation_id=str(entity["RowKey"]),
         month=str(entity["PartitionKey"]),
@@ -378,5 +612,19 @@ def _entity_to_event(entity: Any) -> UsageEvent:
         input_tokens=int(entity["inputTokens"]),
         output_tokens=int(entity["outputTokens"]),
         cost_eur=float(entity["costEur"]),
-        created_at=created_at.astimezone(UTC),
+        created_at=created_at,
+        expires_at=_as_utc(expires_at) if expires_at else None,
     )
+
+
+def _as_utc(value: Any) -> datetime:
+    parsed = value if isinstance(value, datetime) else datetime.fromisoformat(str(value))
+    return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
+
+
+def _entity_etag(entity: Any) -> str:
+    metadata = getattr(entity, "metadata", None) or {}
+    etag = metadata.get("etag") or entity.get("odata.etag")
+    if not etag:
+        raise UsageRepositoryError("AI usage state is missing concurrency metadata.")
+    return str(etag)

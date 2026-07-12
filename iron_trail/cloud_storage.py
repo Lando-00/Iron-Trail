@@ -1,15 +1,14 @@
 """Private Azure storage adapters for identities, datasets, and exports."""
 from __future__ import annotations
 
-import hashlib
 import io
 import json
 import os
 import re
 import secrets
-import threading
+import uuid
 import zipfile
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -28,6 +27,7 @@ from .auth import (
 )
 
 _AUTH_PARTITION = "auth"
+_AUTH_STATE_ROW = "state"
 _SAFE_FILENAME = re.compile(r"[^A-Za-z0-9._-]+")
 
 
@@ -67,7 +67,6 @@ def azure_credential() -> Any:
 class AzureAuthRepository(AuthRepository):
     def __init__(self, table_client: Any) -> None:
         self._table = table_client
-        self._lock = threading.Lock()
 
     @classmethod
     def from_environment(cls) -> "AzureAuthRepository":
@@ -94,30 +93,35 @@ class AzureAuthRepository(AuthRepository):
         bootstrap_hash: str,
         max_users: int,
     ) -> User:
+        from azure.core import MatchConditions
         from azure.core.exceptions import AzureError, ResourceExistsError, ResourceNotFoundError
         from azure.data.tables import UpdateMode
+        from azure.data.tables import TableTransactionError
 
-        try:
-            with self._lock:
+        for _ in range(5):
+            try:
                 existing = self.get_user(identity.user_id)
                 if existing is not None:
                     return existing
 
-                users = self._users()
-                if len(users) >= max_users:
+                state = self._get_or_create_state()
+                if int(state.get("userCount", 0)) >= max_users:
                     raise InvitationError("The private beta is full.")
 
                 code_hash = hash_invite_code(code)
                 role = "member"
-                invite_entity: dict[str, Any] | None = None
-                if not users and bootstrap_hash and secrets.compare_digest(
-                    code_hash, bootstrap_hash
-                ):
+                invite_entity: Any | None = None
+                bootstrap = (
+                    not bool(state.get("bootstrapClaimed"))
+                    and bootstrap_hash
+                    and secrets.compare_digest(code_hash, bootstrap_hash)
+                )
+                if bootstrap:
                     role = "admin"
                 else:
                     try:
-                        invite_entity = dict(
-                            self._table.get_entity(_AUTH_PARTITION, f"invite:{code_hash}")
+                        invite_entity = self._table.get_entity(
+                            _AUTH_PARTITION, f"invite:{code_hash}"
                         )
                     except ResourceNotFoundError as exc:
                         raise InvitationError("That invite code is invalid or expired.") from exc
@@ -126,59 +130,149 @@ class AzureAuthRepository(AuthRepository):
                         raise InvitationError("That invite code is invalid or expired.")
 
                 user = _new_user(identity, role)
-                user_entity = _user_to_entity(user)
-                if invite_entity is None:
-                    self._table.create_entity(user_entity)
+                state_update = dict(state)
+                state_update["userCount"] = int(state.get("userCount", 0)) + 1
+                if bootstrap:
+                    state_update["bootstrapClaimed"] = True
                 else:
-                    invite_entity["usedBy"] = user.user_id
-                    invite_entity["usedAt"] = datetime.now(UTC)
-                    self._table.submit_transaction(
-                        [
-                            ("create", user_entity),
-                            ("update", invite_entity, {"mode": UpdateMode.REPLACE}),
-                        ]
+                    state_update["activeInviteCount"] = max(
+                        0, int(state.get("activeInviteCount", 0)) - 1
                     )
+
+                state_kwargs = {
+                    "etag": _entity_etag(state),
+                    "match_condition": MatchConditions.IfNotModified,
+                    "mode": UpdateMode.REPLACE,
+                }
+                operations: list[tuple] = [
+                    ("create", _user_to_entity(user)),
+                    ("update", state_update, state_kwargs),
+                ]
+                if invite_entity is not None:
+                    invite_update = dict(invite_entity)
+                    invite_update["usedBy"] = user.user_id
+                    invite_update["usedAt"] = datetime.now(UTC)
+                    operations.append(
+                        (
+                            "update",
+                            invite_update,
+                            {
+                                "etag": _entity_etag(invite_entity),
+                                "match_condition": MatchConditions.IfNotModified,
+                                "mode": UpdateMode.REPLACE,
+                            },
+                        )
+                    )
+
+                self._table.submit_transaction(operations)
                 return user
-        except ResourceExistsError:
-            winner = self.get_user(identity.user_id)
-            if winner is not None:
-                return winner
-            raise InvitationError("That invite was already redeemed.") from None
-        except InvitationError:
-            raise
-        except AzureError as exc:
-            raise AuthRepositoryError("The authorization store is unavailable.") from exc
+            except ResourceExistsError:
+                winner = self.get_user(identity.user_id)
+                if winner is not None:
+                    return winner
+            except TableTransactionError as exc:
+                if getattr(exc, "status_code", None) not in {409, 412}:
+                    raise AuthRepositoryError(
+                        "The authorization store is unavailable."
+                    ) from exc
+            except InvitationError:
+                raise
+            except AzureError as exc:
+                raise AuthRepositoryError("The authorization store is unavailable.") from exc
+
+        winner = self.get_user(identity.user_id)
+        if winner is not None:
+            return winner
+        raise InvitationError("That invite was redeemed concurrently. Request a new code.")
 
     def issue_invite(self, actor: User, *, ttl: timedelta, max_users: int) -> str:
+        from azure.core import MatchConditions
         from azure.core.exceptions import AzureError
+        from azure.data.tables import TableTransactionError, UpdateMode
 
-        try:
-            with self._lock:
+        for _ in range(5):
+            try:
                 stored_actor = self.get_user(actor.user_id)
                 if stored_actor is None or not stored_actor.is_admin:
                     raise InvitationError("Only the beta administrator can issue invites.")
-                users = self._users()
-                active_invites = self._active_invites()
-                if len(users) + len(active_invites) >= max_users:
+
+                state = self._get_or_create_state()
+                active_invites = len(self._active_invites())
+                if int(state.get("activeInviteCount", 0)) != active_invites:
+                    reconciled = dict(state)
+                    reconciled["activeInviteCount"] = active_invites
+                    self._table.update_entity(
+                        reconciled,
+                        mode=UpdateMode.REPLACE,
+                        etag=_entity_etag(state),
+                        match_condition=MatchConditions.IfNotModified,
+                    )
+                    continue
+
+                if int(state.get("userCount", 0)) + active_invites >= max_users:
                     raise InvitationError("All beta places are already assigned.")
 
                 code = secrets.token_urlsafe(24)
                 code_hash = hash_invite_code(code)
-                self._table.create_entity(
-                    {
-                        "PartitionKey": _AUTH_PARTITION,
-                        "RowKey": f"invite:{code_hash}",
-                        "expiresAt": datetime.now(UTC) + ttl,
-                        "createdAt": datetime.now(UTC),
-                        "createdBy": actor.user_id,
-                        "usedBy": "",
-                    }
+                invite = {
+                    "PartitionKey": _AUTH_PARTITION,
+                    "RowKey": f"invite:{code_hash}",
+                    "expiresAt": datetime.now(UTC) + ttl,
+                    "createdAt": datetime.now(UTC),
+                    "createdBy": actor.user_id,
+                    "usedBy": "",
+                }
+                state_update = dict(state)
+                state_update["activeInviteCount"] = active_invites + 1
+                self._table.submit_transaction(
+                    [
+                        ("create", invite),
+                        (
+                            "update",
+                            state_update,
+                            {
+                                "etag": _entity_etag(state),
+                                "match_condition": MatchConditions.IfNotModified,
+                                "mode": UpdateMode.REPLACE,
+                            },
+                        ),
+                    ]
                 )
                 return code
-        except InvitationError:
-            raise
-        except AzureError as exc:
-            raise AuthRepositoryError("The authorization store is unavailable.") from exc
+            except TableTransactionError as exc:
+                if getattr(exc, "status_code", None) not in {409, 412}:
+                    raise AuthRepositoryError(
+                        "The authorization store is unavailable."
+                    ) from exc
+            except InvitationError:
+                raise
+            except AzureError as exc:
+                if getattr(exc, "status_code", None) not in {409, 412}:
+                    raise AuthRepositoryError(
+                        "The authorization store is unavailable."
+                    ) from exc
+
+        raise InvitationError("Invite creation conflicted with another request. Try again.")
+
+    def _get_or_create_state(self) -> Any:
+        from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
+
+        try:
+            return self._table.get_entity(_AUTH_PARTITION, _AUTH_STATE_ROW)
+        except ResourceNotFoundError:
+            users = self._users()
+            state = {
+                "PartitionKey": _AUTH_PARTITION,
+                "RowKey": _AUTH_STATE_ROW,
+                "activeInviteCount": len(self._active_invites()),
+                "bootstrapClaimed": any(user.is_admin for user in users),
+                "userCount": len(users),
+            }
+            try:
+                self._table.create_entity(state)
+            except ResourceExistsError:
+                pass
+            return self._table.get_entity(_AUTH_PARTITION, _AUTH_STATE_ROW)
 
     def _users(self) -> list[User]:
         entities = self._table.query_entities(
@@ -224,17 +318,21 @@ class AzureDatasetRepository:
         from azure.core.exceptions import AzureError
 
         now = datetime.now(UTC)
-        dataset_id = hashlib.sha256(content).hexdigest()[:24]
+        dataset_id = uuid.uuid4().hex[:24]
         safe_name = sanitize_filename(filename)
         raw_blob = f"raw/{user_id}/{dataset_id}/{safe_name}"
         normalized_blob = f"normalized/{user_id}/{dataset_id}/workouts.parquet"
         parquet = io.BytesIO()
         dataframe.to_parquet(parquet, index=False)
 
+        uploaded: list[str] = []
         try:
             self._container.upload_blob(raw_blob, content, overwrite=True)
+            uploaded.append(raw_blob)
             self._container.upload_blob(normalized_blob, parquet.getvalue(), overwrite=True)
+            uploaded.append(normalized_blob)
         except AzureError as exc:
+            self._delete_blobs_best_effort(uploaded)
             raise CloudStorageError("Unable to save the private dataset.") from exc
 
         record = DatasetRecord(
@@ -253,8 +351,9 @@ class AzureDatasetRepository:
             size_bytes=len(content),
         )
         try:
-            self._table.upsert_entity(_dataset_to_entity(record))
+            self._table.create_entity(_dataset_to_entity(record))
         except AzureError as exc:
+            self._delete_blobs_best_effort(uploaded)
             raise CloudStorageError("Unable to save dataset metadata.") from exc
         return record
 
@@ -272,12 +371,13 @@ class AzureDatasetRepository:
             key=lambda item: item.created_at,
             reverse=True,
         )
+        now = datetime.now(UTC)
         current: list[DatasetRecord] = []
         for record in records:
-            if record.normalized_expires_at <= datetime.now(UTC):
+            if record.normalized_expires_at <= now:
                 self.delete_dataset(user_id, record.dataset_id)
             else:
-                current.append(record)
+                current.append(self._expire_raw(record, now))
         return current
 
     def load_dataset(self, user_id: str, dataset_id: str) -> pd.DataFrame:
@@ -321,10 +421,10 @@ class AzureDatasetRepository:
         records = self.list_datasets(user_id)
         with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             for record in records:
-                for label, blob_name in (
-                    ("raw", record.raw_blob),
-                    ("normalized", record.normalized_blob),
-                ):
+                blobs = [("normalized", record.normalized_blob)]
+                if record.raw_blob and record.raw_expires_at > datetime.now(UTC):
+                    blobs.insert(0, ("raw", record.raw_blob))
+                for label, blob_name in blobs:
                     try:
                         payload = self._container.download_blob(blob_name).readall()
                     except ResourceNotFoundError:
@@ -352,6 +452,36 @@ class AzureDatasetRepository:
             raise CloudStorageError("Unable to read dataset metadata.") from exc
         return _entity_to_dataset(entity)
 
+    def _expire_raw(self, record: DatasetRecord, now: datetime) -> DatasetRecord:
+        if not record.raw_blob or record.raw_expires_at > now:
+            return record
+
+        from azure.core.exceptions import AzureError, ResourceNotFoundError
+        from azure.data.tables import UpdateMode
+
+        try:
+            self._container.delete_blob(record.raw_blob, delete_snapshots="include")
+        except ResourceNotFoundError:
+            pass
+        except AzureError as exc:
+            raise CloudStorageError("Unable to enforce raw-file retention.") from exc
+
+        updated = replace(record, raw_blob="")
+        try:
+            self._table.update_entity(_dataset_to_entity(updated), mode=UpdateMode.REPLACE)
+        except AzureError as exc:
+            raise CloudStorageError("Unable to update retention metadata.") from exc
+        return updated
+
+    def _delete_blobs_best_effort(self, names: list[str]) -> None:
+        from azure.core.exceptions import AzureError
+
+        for name in names:
+            try:
+                self._container.delete_blob(name, delete_snapshots="include")
+            except AzureError:
+                continue
+
 
 class InMemoryDatasetRepository:
     def __init__(self) -> None:
@@ -367,7 +497,7 @@ class InMemoryDatasetRepository:
         dataframe: pd.DataFrame,
     ) -> DatasetRecord:
         now = datetime.now(UTC)
-        dataset_id = hashlib.sha256(content).hexdigest()[:24]
+        dataset_id = uuid.uuid4().hex[:24]
         record = DatasetRecord(
             user_id=user_id,
             dataset_id=dataset_id,
@@ -386,11 +516,24 @@ class InMemoryDatasetRepository:
         return record
 
     def list_datasets(self, user_id: str) -> list[DatasetRecord]:
-        return sorted(
+        now = datetime.now(UTC)
+        records = sorted(
             (record for (owner, _), record in self.records.items() if owner == user_id),
             key=lambda item: item.created_at,
             reverse=True,
         )
+        current: list[DatasetRecord] = []
+        for record in records:
+            if record.normalized_expires_at <= now:
+                self.delete_dataset(user_id, record.dataset_id)
+                continue
+            if record.raw_blob and record.raw_expires_at <= now:
+                key = (user_id, record.dataset_id)
+                self.raw.pop(key, None)
+                record = replace(record, raw_blob="")
+                self.records[key] = record
+            current.append(record)
+        return current
 
     def load_dataset(self, user_id: str, dataset_id: str) -> pd.DataFrame:
         try:
@@ -416,7 +559,10 @@ class InMemoryDatasetRepository:
         with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             for record in records:
                 key = (user_id, record.dataset_id)
-                archive.writestr(f"{record.dataset_id}/raw/{record.filename}", self.raw[key])
+                if record.raw_blob:
+                    archive.writestr(
+                        f"{record.dataset_id}/raw/{record.filename}", self.raw[key]
+                    )
                 parquet = io.BytesIO()
                 self.frames[key].to_parquet(parquet, index=False)
                 archive.writestr(
@@ -547,6 +693,14 @@ def _record_json(record: DatasetRecord) -> dict[str, Any]:
 def _as_utc(value: Any) -> datetime:
     parsed = value if isinstance(value, datetime) else datetime.fromisoformat(str(value))
     return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
+
+
+def _entity_etag(entity: Any) -> str:
+    metadata = getattr(entity, "metadata", None) or {}
+    etag = metadata.get("etag") or entity.get("odata.etag")
+    if not etag:
+        raise AuthRepositoryError("Authorization state is missing concurrency metadata.")
+    return str(etag)
 
 
 def _odata(value: str) -> str:

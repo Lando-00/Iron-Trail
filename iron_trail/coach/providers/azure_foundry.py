@@ -42,11 +42,11 @@ class AzureFoundryProvider:
         self.last_usage: TokenUsage | None = None
 
     def chat(self, messages: list[Message], *, timeout: float = 120.0) -> str:
-        self.last_usage = None
         request_messages = [
             {"role": message.role, "content": message.content} for message in messages
         ]
         with self._lock:
+            self.last_usage = None
             response = self._client.with_options(timeout=timeout).chat.completions.create(
                 model=self.deployment,
                 messages=request_messages,
@@ -76,4 +76,3 @@ class AzureFoundryProvider:
             azure_ad_token_provider=token_provider,
             max_retries=2,
         )
-

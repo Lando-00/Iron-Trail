@@ -13,6 +13,61 @@ from iron_trail.auth import (
     hash_invite_code,
     identity_from_headers,
 )
+from iron_trail.cloud_storage import AzureAuthRepository
+
+
+class _Entity(dict):
+    def __init__(self, value, etag):
+        super().__init__(value)
+        self.metadata = {"etag": etag}
+
+
+class _FakeTable:
+    def __init__(self) -> None:
+        self.entities = {}
+        self.version = 0
+        self.transactions = []
+
+    def _store(self, entity):
+        self.version += 1
+        key = (entity["PartitionKey"], entity["RowKey"])
+        self.entities[key] = _Entity(dict(entity), f'etag-{self.version}')
+
+    def get_entity(self, partition, row):
+        from azure.core.exceptions import ResourceNotFoundError
+
+        try:
+            return self.entities[(partition, row)]
+        except KeyError as exc:
+            raise ResourceNotFoundError("missing") from exc
+
+    def create_entity(self, entity):
+        self._store(entity)
+
+    def query_entities(self, query):
+        if "RowKey ge 'user:'" in query:
+            prefix = "user:"
+        elif "RowKey ge 'invite:'" in query:
+            prefix = "invite:"
+        else:
+            prefix = ""
+        return [
+            entity
+            for (_, row), entity in self.entities.items()
+            if row.startswith(prefix)
+        ]
+
+    def update_entity(self, entity, **kwargs):
+        self._store(entity)
+
+    def submit_transaction(self, operations):
+        self.transactions.append(operations)
+        for operation in operations:
+            verb, entity = operation[:2]
+            if verb in {"create", "update"}:
+                self._store(entity)
+            elif verb == "delete":
+                self.entities.pop((entity["PartitionKey"], entity["RowKey"]), None)
 
 
 def test_identity_uses_immutable_provider_and_principal() -> None:
@@ -90,3 +145,31 @@ def test_admin_issues_single_use_invite() -> None:
             max_users=3,
         )
 
+
+def test_azure_repository_uses_conditional_transactions() -> None:
+    table = _FakeTable()
+    repo = AzureAuthRepository(table)
+    bootstrap_code = "owner-bootstrap-code"
+    owner = repo.redeem(
+        Identity("aad", "owner", "Owner"),
+        bootstrap_code,
+        bootstrap_hash=hash_invite_code(bootstrap_code),
+        max_users=2,
+    )
+    code = repo.issue_invite(owner, ttl=timedelta(hours=1), max_users=2)
+    repo.redeem(
+        Identity("google", "member", "Member"),
+        code,
+        bootstrap_hash="",
+        max_users=2,
+    )
+
+    update_kwargs = [
+        operation[2]
+        for transaction in table.transactions
+        for operation in transaction
+        if operation[0] == "update"
+    ]
+    assert update_kwargs
+    assert all(kwargs.get("etag") for kwargs in update_kwargs)
+    assert all(kwargs.get("match_condition") is not None for kwargs in update_kwargs)

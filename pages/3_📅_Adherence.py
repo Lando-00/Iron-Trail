@@ -119,4 +119,4 @@ else:
         else "night (8 pm+)"
     )
     article = "an" if bucket[0] in "aeiou" else "a"
-    ui.callout("info", f"Peak training hour: <strong>{peak_hour}:00</strong> — you're {article} <strong>{bucket}</strong> lifter.")
+    ui.callout("info", f"Peak training hour: {peak_hour}:00 — you're {article} {bucket} lifter.")

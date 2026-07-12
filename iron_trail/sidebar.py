@@ -181,6 +181,7 @@ def _render_cloud_data_source() -> tuple[pd.DataFrame, str, float]:
                 st.error(str(exc))
             else:
                 st.session_state["it_saved_upload_id"] = record.dataset_id
+                st.session_state.pop("it_data_export_bytes", None)
                 st.success("Saved privately with automatic expiry.")
     else:
         records = repository.list_datasets(user.user_id)
@@ -224,16 +225,22 @@ def _render_cloud_data_controls(user_id: str, repository) -> None:
         )
         if st.button("Delete selected dataset", key="delete_cloud_dataset"):
             repository.delete_dataset(user_id, selected.dataset_id)
+            st.session_state.pop("it_data_export_bytes", None)
             st.rerun()
 
-        archive = repository.export_user_archive(user_id)
-        st.download_button(
-            "Download all saved data",
-            data=archive,
-            file_name="irontrail-data-export.zip",
-            mime="application/zip",
-            use_container_width=True,
-        )
+        if st.button("Prepare data export", key="prepare_cloud_export"):
+            st.session_state["it_data_export_bytes"] = repository.export_user_archive(
+                user_id
+            )
+        archive = st.session_state.get("it_data_export_bytes")
+        if archive:
+            st.download_button(
+                "Download all saved data",
+                data=archive,
+                file_name="irontrail-data-export.zip",
+                mime="application/zip",
+                use_container_width=True,
+            )
 
         confirm = st.checkbox("I understand this deletes all saved datasets.")
         if st.button(
@@ -243,4 +250,5 @@ def _render_cloud_data_controls(user_id: str, repository) -> None:
             use_container_width=True,
         ):
             repository.delete_all(user_id)
+            st.session_state.pop("it_data_export_bytes", None)
             st.rerun()

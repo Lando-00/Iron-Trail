@@ -30,8 +30,25 @@ def configure_telemetry(
             from azure.monitor.opentelemetry import configure_azure_monitor
 
             configurator = configure_azure_monitor
-        configurator(logger_name="iron_trail")
+        configurator(
+            disable_offline_storage=True,
+            enable_live_metrics=False,
+            enable_performance_counters=False,
+            instrumentation_options={
+                name: {"enabled": False}
+                for name in (
+                    "azure_sdk",
+                    "django",
+                    "fastapi",
+                    "flask",
+                    "psycopg2",
+                    "requests",
+                    "urllib",
+                    "urllib3",
+                )
+            },
+            logger_name="iron_trail",
+        )
         logging.getLogger("iron_trail").setLevel(logging.INFO)
         _CONFIGURED = True
         return True
-

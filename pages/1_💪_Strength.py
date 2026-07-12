@@ -52,7 +52,7 @@ if ps is not None:
         "regressing": "warning",
         "new": "info",
     }[ps.status]
-    ui.callout(kind, f"<strong>{exercise}</strong> — {ps.message}")
+    ui.callout(kind, f"{exercise} — {ps.message}")
 
 # Main chart
 session_data["date"] = pd.to_datetime(session_data["workout_date"])
@@ -166,4 +166,4 @@ if show_yoy:
         delta = yoy["current_delta"]
         kind = "success" if delta > 0 else "warning" if delta < 0 else "info"
         sign = "+" if delta > 0 else ""
-        ui.callout(kind, f"<strong>You vs same point last year:</strong> {sign}{delta:.1f} kg")
+        ui.callout(kind, f"You vs same point last year: {sign}{delta:.1f} kg")

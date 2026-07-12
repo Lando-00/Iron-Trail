@@ -6,6 +6,7 @@ Plotly theme is registered.
 """
 from __future__ import annotations
 
+import html
 from collections.abc import Iterable
 
 import plotly.graph_objects as go
@@ -419,12 +420,13 @@ def setup_page(title: str, icon: str, *, layout: str = "wide") -> None:
 
 def mini_metric(label: str, value: str, unit: str = "", sub: str = "") -> None:
     """Compact metric card with controlled font sizing — for tight grids."""
-    unit_html = f'<span class="it-mini-metric-unit">{unit}</span>' if unit else ""
-    sub_html = f'<div class="it-mini-metric-sub">{sub}</div>' if sub else ""
+    safe_label, safe_value = _escape(label), _escape(value)
+    unit_html = f'<span class="it-mini-metric-unit">{_escape(unit)}</span>' if unit else ""
+    sub_html = f'<div class="it-mini-metric-sub">{_escape(sub)}</div>' if sub else ""
     st.markdown(
         f'<div class="it-mini-metric">'
-        f'<div class="it-mini-metric-label">{label}</div>'
-        f'<div class="it-mini-metric-value">{value}{unit_html}</div>'
+        f'<div class="it-mini-metric-label">{safe_label}</div>'
+        f'<div class="it-mini-metric-value">{safe_value}{unit_html}</div>'
         f"{sub_html}"
         f"</div>",
         unsafe_allow_html=True,
@@ -432,12 +434,12 @@ def mini_metric(label: str, value: str, unit: str = "", sub: str = "") -> None:
 
 
 def hero(label: str, value: str, subtitle: str = "", unit: str = "") -> None:
-    unit_html = f'<span class="it-hero-unit">{unit}</span>' if unit else ""
-    sub_html = f'<div class="it-hero-subtitle">{subtitle}</div>' if subtitle else ""
+    unit_html = f'<span class="it-hero-unit">{_escape(unit)}</span>' if unit else ""
+    sub_html = f'<div class="it-hero-subtitle">{_escape(subtitle)}</div>' if subtitle else ""
     st.markdown(
         f'<div class="it-hero">'
-        f'<div class="it-hero-label">{label}</div>'
-        f'<div class="it-hero-value">{value}{unit_html}</div>'
+        f'<div class="it-hero-label">{_escape(label)}</div>'
+        f'<div class="it-hero-value">{_escape(value)}{unit_html}</div>'
         f"{sub_html}"
         f"</div>",
         unsafe_allow_html=True,
@@ -445,22 +447,26 @@ def hero(label: str, value: str, subtitle: str = "", unit: str = "") -> None:
 
 
 def section_title(text: str) -> None:
-    st.markdown(f'<div class="it-section-title">{text}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="it-section-title">{_escape(text)}</div>', unsafe_allow_html=True)
 
 
 def callout(kind: str, message: str, icon: str = "") -> None:
-    icon_html = f'<span class="it-callout-icon">{icon}</span>' if icon else ""
-    st.markdown(f'<div class="it-callout {kind}">{icon_html}{message}</div>', unsafe_allow_html=True)
+    safe_kind = kind if kind in {"success", "warning", "info", "gold"} else "info"
+    icon_html = f'<span class="it-callout-icon">{_escape(icon)}</span>' if icon else ""
+    st.markdown(
+        f'<div class="it-callout {safe_kind}">{icon_html}{_escape(message)}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def badge_card(icon: str, name: str, criteria: str, progress_text: str, unlocked: bool) -> None:
     klass = "unlocked" if unlocked else "locked"
     st.markdown(
         f'<div class="it-badge {klass}">'
-        f'<div class="it-badge-icon">{icon}</div>'
-        f'<div class="it-badge-name">{name}</div>'
-        f'<div class="it-badge-criteria">{criteria}</div>'
-        f'<div class="it-badge-progress">{progress_text}</div>'
+        f'<div class="it-badge-icon">{_escape(icon)}</div>'
+        f'<div class="it-badge-name">{_escape(name)}</div>'
+        f'<div class="it-badge-criteria">{_escape(criteria)}</div>'
+        f'<div class="it-badge-progress">{_escape(progress_text)}</div>'
         f"</div>",
         unsafe_allow_html=True,
     )
@@ -469,10 +475,10 @@ def badge_card(icon: str, name: str, criteria: str, progress_text: str, unlocked
 def lowlight_card(date_str: str, title: str, caption: str, stats: str) -> None:
     st.markdown(
         f'<div class="it-lowlight">'
-        f'<div class="it-lowlight-date">{date_str}</div>'
-        f'<div class="it-lowlight-title">{title}</div>'
-        f'<div class="it-lowlight-caption">"{caption}"</div>'
-        f'<div class="it-lowlight-stats">{stats}</div>'
+        f'<div class="it-lowlight-date">{_escape(date_str)}</div>'
+        f'<div class="it-lowlight-title">{_escape(title)}</div>'
+        f'<div class="it-lowlight-caption">"{_escape(caption)}"</div>'
+        f'<div class="it-lowlight-stats">{_escape(stats)}</div>'
         f"</div>",
         unsafe_allow_html=True,
     )
@@ -482,10 +488,10 @@ def highlight_card(date_str: str, title: str, caption: str, stats: str) -> None:
     """Gold-glow inverse of lowlight_card — for Hall of Fame entries."""
     st.markdown(
         f'<div class="it-highlight">'
-        f'<div class="it-highlight-date">{date_str}</div>'
-        f'<div class="it-highlight-title">{title}</div>'
-        f'<div class="it-highlight-caption">"{caption}"</div>'
-        f'<div class="it-highlight-stats">{stats}</div>'
+        f'<div class="it-highlight-date">{_escape(date_str)}</div>'
+        f'<div class="it-highlight-title">{_escape(title)}</div>'
+        f'<div class="it-highlight-caption">"{_escape(caption)}"</div>'
+        f'<div class="it-highlight-stats">{_escape(stats)}</div>'
         f"</div>",
         unsafe_allow_html=True,
     )
@@ -493,22 +499,28 @@ def highlight_card(date_str: str, title: str, caption: str, stats: str) -> None:
 
 def quote_card(text: str, meta: str = "", kind: str = "default", variants: list[str] | None = None) -> None:
     """Big-quote card for the Quotes page."""
-    klass = f"it-quote-card {kind}" if kind != "default" else "it-quote-card"
+    safe_kind = kind if kind in {"cluster", "emotional", "roast", "emoji"} else "default"
+    klass = f"it-quote-card {safe_kind}" if safe_kind != "default" else "it-quote-card"
     variants_html = ""
     if variants:
-        chips = "".join(f'<span class="it-quote-variant">{v}</span>' for v in variants)
+        chips = "".join(
+            f'<span class="it-quote-variant">{_escape(variant)}</span>'
+            for variant in variants
+        )
         variants_html = f'<div class="it-quote-variants">{chips}</div>'
-    meta_html = f'<div class="it-quote-meta">{meta}</div>' if meta else ""
-    # Escape doublequotes in text to avoid breaking the markup
-    safe_text = text.replace('"', '&quot;')
+    meta_html = f'<div class="it-quote-meta">{_escape(meta)}</div>' if meta else ""
     st.markdown(
         f'<div class="{klass}">'
-        f'<div class="it-quote-text">"{safe_text}"</div>'
+        f'<div class="it-quote-text">"{_escape(text)}"</div>'
         f"{variants_html}"
         f"{meta_html}"
         f"</div>",
         unsafe_allow_html=True,
     )
+
+
+def _escape(value: object) -> str:
+    return html.escape(str(value), quote=True)
 
 
 def sparkline(values: Iterable[float], color: str | None = None, height: int = 56) -> go.Figure:

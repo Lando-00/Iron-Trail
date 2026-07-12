@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -102,3 +102,40 @@ def test_global_budget_counts_all_users() -> None:
             [Message("user", "hello")]
         )
 
+
+def test_abandoned_reservation_expires() -> None:
+    now = datetime(2026, 7, 12, tzinfo=UTC)
+    repo = InMemoryUsageRepository()
+    limiter = UsageLimiter(
+        repo,
+        _policy(review_daily=1, reservation_ttl_seconds=300),
+        clock=lambda: now,
+    )
+    limiter.reserve("user-a", CallKind.REVIEW, input_tokens=10)
+
+    later = UsageLimiter(
+        repo,
+        _policy(review_daily=1, reservation_ttl_seconds=300),
+        clock=lambda: now + timedelta(seconds=301),
+    )
+    later.reserve("user-a", CallKind.REVIEW, input_tokens=10)
+
+    assert len(repo.events) == 1
+
+
+def test_provider_timeout_extends_reservation_lease() -> None:
+    now = datetime(2026, 7, 12, tzinfo=UTC)
+    repo = InMemoryUsageRepository()
+    limiter = UsageLimiter(
+        repo,
+        _policy(review_daily=1, reservation_ttl_seconds=300),
+        clock=lambda: now,
+    )
+    reservation = limiter.reserve(
+        "user-a",
+        CallKind.REVIEW,
+        input_tokens=10,
+        hold_seconds=600,
+    )
+
+    assert reservation.expires_at == now + timedelta(seconds=600)

@@ -43,7 +43,6 @@ def _get_copilot_provider():
     return CopilotProvider()
 
 
-@st.cache_resource(show_spinner=False)
 def _get_foundry_provider():
     from iron_trail.coach.providers.azure_foundry import AzureFoundryProvider
 

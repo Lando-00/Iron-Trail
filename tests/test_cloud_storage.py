@@ -3,6 +3,8 @@ from __future__ import annotations
 import io
 import json
 import zipfile
+from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 import pytest
@@ -55,3 +57,45 @@ def test_delete_all_is_scoped_to_user() -> None:
 def test_filename_is_reduced_to_safe_basename() -> None:
     assert sanitize_filename("../../My export (final).csv") == "My_export_final_.csv"
 
+
+def test_expired_raw_upload_is_not_exported() -> None:
+    repo = InMemoryDatasetRepository()
+    record = repo.save_hevy_dataset("user-a", b"private-a", "a.csv", _frame())
+    key = ("user-a", record.dataset_id)
+    repo.records[key] = replace(
+        record,
+        raw_expires_at=datetime.now(UTC) - timedelta(seconds=1),
+    )
+
+    with zipfile.ZipFile(io.BytesIO(repo.export_user_archive("user-a"))) as archive:
+        names = archive.namelist()
+
+    assert not any("/raw/" in name for name in names)
+    assert any("/normalized/" in name for name in names)
+
+
+def test_metadata_failure_removes_partially_uploaded_blobs() -> None:
+    from azure.core.exceptions import AzureError
+
+    class Container:
+        def __init__(self) -> None:
+            self.blobs = {}
+
+        def upload_blob(self, name, content, overwrite):
+            self.blobs[name] = content
+
+        def delete_blob(self, name, delete_snapshots):
+            self.blobs.pop(name, None)
+
+    class Table:
+        def create_entity(self, entity):
+            raise AzureError("metadata failed")
+
+    container = Container()
+    from iron_trail.cloud_storage import AzureDatasetRepository
+
+    repo = AzureDatasetRepository(container, Table())
+    with pytest.raises(CloudStorageError, match="metadata"):
+        repo.save_hevy_dataset("user-a", b"private-a", "a.csv", _frame())
+
+    assert container.blobs == {}

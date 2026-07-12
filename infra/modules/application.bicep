@@ -352,8 +352,8 @@ module containerApp 'br/public:avm/res/app/container-app:0.23.0' = {
         probes: [
           {
             httpGet: {
-              path: '/_stcore/health'
-              port: 8501
+              path: '/'
+              port: 80
             }
             initialDelaySeconds: 10
             periodSeconds: 30
@@ -361,8 +361,8 @@ module containerApp 'br/public:avm/res/app/container-app:0.23.0' = {
           }
           {
             httpGet: {
-              path: '/_stcore/health'
-              port: 8501
+              path: '/'
+              port: 80
             }
             initialDelaySeconds: 5
             periodSeconds: 10
@@ -379,7 +379,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.23.0' = {
     environmentResourceId: containerAppsEnvironment.outputs.resourceId
     ingressAllowInsecure: false
     ingressExternal: true
-    ingressTargetPort: 8501
+    ingressTargetPort: 80
     ingressTransport: 'auto'
     location: location
     managedIdentities: {

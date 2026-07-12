@@ -157,9 +157,6 @@ def local_user() -> User:
 def current_user() -> User:
     if not runtime.is_cloud():
         return local_user()
-    user = st.session_state.get("it_current_user")
-    if isinstance(user, User):
-        return user
     return require_invited_user()
 
 
@@ -177,15 +174,25 @@ def require_invited_user(repository: AuthRepository | None = None) -> User:
         _render_login()
         st.stop()
 
-    cached = st.session_state.get("it_current_user")
-    if isinstance(cached, User) and cached.user_id == identity.user_id:
-        return cached
-
     try:
         repo = repository or get_auth_repository()
     except runtime.ConfigurationError:
         st.error("IronTrail cloud authentication is not configured.")
         st.stop()
+    cached = st.session_state.get("it_current_user")
+    checked_at = st.session_state.get("it_current_user_checked_at")
+    revalidate_after = timedelta(
+        seconds=runtime.env_int("IRONTRAIL_AUTH_REVALIDATE_SECONDS", 30, minimum=0)
+    )
+    now = datetime.now(UTC)
+    if (
+        isinstance(cached, User)
+        and cached.user_id == identity.user_id
+        and isinstance(checked_at, datetime)
+        and now - checked_at < revalidate_after
+    ):
+        return cached
+
     try:
         user = repo.get_user(identity.user_id)
     except AuthRepositoryError:
@@ -193,8 +200,11 @@ def require_invited_user(repository: AuthRepository | None = None) -> User:
         st.stop()
     if user is not None:
         st.session_state["it_current_user"] = user
+        st.session_state["it_current_user_checked_at"] = now
         return user
 
+    st.session_state.pop("it_current_user", None)
+    st.session_state.pop("it_current_user_checked_at", None)
     _render_invite_gate(identity, repo)
     st.stop()
 
@@ -323,6 +333,7 @@ def _render_invite_gate(identity: Identity, repository: AuthRepository) -> None:
             st.error(str(exc))
         else:
             st.session_state["it_current_user"] = user
+            st.session_state["it_current_user_checked_at"] = datetime.now(UTC)
             st.rerun()
     st.markdown("[Sign out](/.auth/logout?post_logout_redirect_uri=/)")
 

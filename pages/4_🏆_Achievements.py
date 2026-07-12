@@ -26,7 +26,7 @@ c3.metric("Total badges", f"{len(badges)}")
 if locked:
     ui.callout(
         "gold",
-        f"<strong>Closest to unlock:</strong> {locked[0]['icon']} {locked[0]['name']} — "
+        f"Closest to unlock: {locked[0]['icon']} {locked[0]['name']} — "
         f"{locked[0]['current_str']} / {locked[0]['target_str']} ({locked[0]['progress']*100:.0f}% there)",
     )
 
