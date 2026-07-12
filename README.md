@@ -14,11 +14,12 @@
 ## What it is
 
 You export your [Hevy](https://hevyapp.com) workout CSV, drop it into
-`data/raw/`, run `streamlit run streamlit_app.py`, and get a five-page
-dashboard that actually surfaces the things that matter weekly. No
-SaaS, no account, no email field, no "upgrade for charts" wall. Your CSV
-stays on your disk. The repo ships with a 90-day synthetic sample dataset
-so the public demo runs out-of-the-box for anyone.
+`data/raw/`, run `streamlit run streamlit_app.py`, and get a dashboard
+that actually surfaces the things that matter weekly. **Local mode is still
+the default:** no account, no hosted storage, and your CSV stays on your disk.
+The repo also contains a separately gated Azure private-beta mode with
+authentication, user-isolated storage, retention limits, and a metered AI
+provider. The included 90-day synthetic dataset runs out of the box.
 
 The differentiating bit vs prior art is **writeback into the vault**:
 every workout becomes `Vault/Hevy/Daily/YYYY-MM-DD.md` with frontmatter,
@@ -36,7 +37,7 @@ an LLM-written weekly review.
 | 📅 **Adherence** | Calendar coloured by K-Means session archetype (Strength / Hypertrophy / Pump / Quick), archetype distribution, time-of-day histogram |
 | 🏆 **Achievements** | 20-badge library with progress bars, closest-to-unlock callout, unlocked/locked walls |
 | 😂 **Quotes** | Indecisive-naming clusters, single-word laments, self-roasting, emoji-heavy titles — your real workout titles surfaced as a wall |
-| 💬 **Coach** *(new)* | LLM-written weekly + monthly training reviews, "Ask Your Data" chat, 5 personality presets. Export as Markdown / PDF / save-to-vault. Powered by your Copilot Pro sub. |
+| 💬 **Coach** | LLM-written weekly + monthly training reviews, "Ask Your Data" chat, 5 personality presets. Local mode uses your Copilot subscription; hosted mode uses a rate-limited Microsoft Foundry deployment. |
 
 Plus a **💀 Hall of Shame** + **🏆 Hall of Fame** expander on Overview
 (worst and best sessions with witty captions), a **📝 Generate daily
@@ -92,6 +93,17 @@ Opens at `http://localhost:8501`. The sidebar starts on the synthetic
 sample CSV — no Hevy export needed to see the app working.
 
 On macOS / Linux, swap `Activate.ps1` for `source .venv/bin/activate`.
+
+## Runtime modes
+
+| Mode | Default | Data and AI behavior |
+|---|---|---|
+| `local` | Yes | Local CSV picker/upload, optional Vault filesystem writeback, Copilot SDK or mock Coach |
+| `cloud` | No | Easy Auth identity gate, one-time invites, session-only upload by default, opt-in Azure storage, Foundry Coach with hard usage limits |
+
+Set `IRONTRAIL_MODE=cloud` only in the prepared Azure container environment.
+Cloud mode deliberately removes server filesystem/Vault path inputs. Markdown,
+PDF, PR posters, and daily notes remain browser downloads.
 
 ## Use your own data
 
@@ -157,9 +169,10 @@ so it's filterable by Obsidian Dataview / Bases queries.
 
 ## 💬 The Coach — AI weekly + monthly reviews
 
-The **Coach** page (`pages/6_💬_Coach.py`) is a first-class feature: it
-asks Copilot to write training reviews of your data inline, and gives you
-four ways to export the result.
+The **Coach** page (`pages/6_💬_Coach.py`) is a first-class feature. The
+provider is selected by runtime: local IronTrail can use the Copilot SDK;
+hosted IronTrail uses a deployment-name-driven Microsoft Foundry provider
+authenticated with managed identity.
 
 ```
 You ──▶ click "Generate weekly review"
@@ -168,7 +181,8 @@ You ──▶ click "Generate weekly review"
     coach.summary.build_weekly(df) ──▶ structured dict (sessions, top e1RMs,
          │                              plateaus, push:pull, archetype mix)
          ▼
-    coach.providers.copilot ──▶ Copilot SDK ──▶ your Copilot Pro sub
+    local:  coach.providers.copilot ──▶ your Copilot subscription
+    cloud:  coach.providers.azure_foundry ──▶ managed identity + usage ledger
          │
          │ Markdown body
          ▼
@@ -282,18 +296,27 @@ expander on the Overview page — add a row for each.
 
 ## Privacy
 
-- **Your CSV stays local.** `data/raw/*` is [gitignored](.gitignore) (only
-  the `.gitkeep` is tracked).
-- **No secrets needed.** Bodyweight is configured via the sidebar at
-  runtime — `.streamlit/secrets.toml` is gitignored as a precaution but the
-  app doesn't read any secrets.
-- **No telemetry.** `.streamlit/config.toml` sets
-  `gatherUsageStats = false`.
-- **No network calls.** Phase 1 is fully offline.
+**Local mode**
 
-If you self-host on [Streamlit Community Cloud](https://share.streamlit.io)
-the only data exposed is whatever CSV you commit — which should remain
-nothing real, since `data/raw/*` is gitignored.
+- `data/raw/*` is gitignored; real workout exports stay on your machine.
+- Streamlit usage telemetry is disabled.
+- Uploaded bytes stay in the local Streamlit session.
+- Vault writeback is explicit and targets a path you choose.
+
+**Prepared Azure private-beta mode**
+
+- Microsoft/Google identities pass through Container Apps Easy Auth, then an
+  application-level single-use invite gate.
+- Storage keys are partitioned by an opaque ID derived from the immutable
+  provider principal, not display name or filename.
+- Uploads remain session-only unless the user selects **Save privately**.
+- Saved raw files expire after 30 days; normalized data expires after 60 days.
+- Users can export or delete their saved datasets.
+- Raw CSVs, raw heart-rate samples, free-text notes, and export files are not
+  sent to the hosted model. The Coach receives deterministic aggregates.
+- The cloud image does not contain the Copilot SDK or the owner's credentials.
+- Azure Monitor is enabled only when its connection string is provided; app
+  code logs operational failures, not workout contents.
 
 ## Stack
 
@@ -307,20 +330,21 @@ nothing real, since `data/raw/*` is gitignored.
 | ML | [scikit-learn](https://scikit-learn.org/) (K-Means archetypes) + numpy.polyfit (forecast) |
 | Theme | Custom CSS in [`iron_trail/theme.py`](iron_trail/theme.py) |
 
-## Deployment — Streamlit Community Cloud
+## Deployment — Azure private beta
 
-The repo is ready to deploy as-is:
+The deployment path is Azure Developer CLI + Bicep:
 
-1. Push to a public GitHub repo (see commands at bottom of README).
-2. Go to [share.streamlit.io](https://share.streamlit.io) and connect your
-   GitHub account.
-3. Pick this repo, set the entry point to `streamlit_app.py`, and set the
-   Python version to **3.12** (matches [`.python-version`](.python-version)).
-4. Click deploy. There are no secrets to configure — bodyweight and vault
-   path are runtime sidebar inputs.
-5. Your dashboard is live at
-   `https://<your-app>.streamlit.app`. The public demo runs against the
-   committed synthetic sample.
+- Azure Container Apps Consumption, scale-to-zero, maximum one replica.
+- Private Blob/Table storage with managed identity and lifecycle policies.
+- Container Apps Easy Auth plus hashed single-use invite codes.
+- Existing Microsoft Foundry account/project, with the model deployment
+  configured separately.
+- Application Insights + Log Analytics and a EUR 25 budget ceiling.
+
+See [`.azure/deployment-plan.md`](.azure/deployment-plan.md) for the exact
+architecture, phased approvals, cost assumptions, and hard-stop conditions.
+The code-first stage does **not** authorize `azd provision` or `azd up`; model
+credit proof and website deployment are separate later gates.
 
 ## Roadmap
 
@@ -329,8 +353,10 @@ See [`ROADMAP.md`](./ROADMAP.md). TL;DR:
 - **Phase 1 — Done.** The dashboard you see in the screenshots above.
 - **Phase 2 — AI Training Coach.** Weekly LLM-written review note in the
   vault.
-- **Phase 3 — Cross-source.** Hevy Pro API for auto-sync, Samsung Health
-  Connect for recovery context, Strength Standards percentile rankings.
+- **Private beta — code first.** Authentication, storage isolation, Foundry,
+  usage limits, container packaging, and Azure IaC.
+- **Cross-source.** Samsung Health recovery context, then an Android Health
+  Connect companion; do not build new integrations on deprecated Google Fit.
 
 ## Contributing
 

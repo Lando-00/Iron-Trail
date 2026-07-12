@@ -33,8 +33,8 @@ section of the project plan).
   pipeline.
 - **Streamlit.** Pages are self-contained — sidebar + load + render. Shared
   rendering primitives live in `iron_trail/ui.py`.
-- **Tests.** No formal suite yet; smoke-test via
-  `python scripts/snapshot_public.py` against the sample dataset.
+- **Tests.** Run `python -m pytest -q` and `ruff check .`. For deployment
+  changes, also build the Docker image and compile the Bicep entry point.
 
 ## Don't
 

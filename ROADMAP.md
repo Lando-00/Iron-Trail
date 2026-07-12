@@ -93,6 +93,23 @@ Triggered when CSV re-export becomes the actual blocker.
   the public [Symmetric Strength](https://symmetricstrength.com/) tables so
   every lift gets a "you're in the top X% for your bracket" badge.
 
+## Private Azure beta — Code-first
+
+The hosted path keeps the local app intact and adds a separate cloud mode:
+
+- Invite-only access for five testers using Easy Auth and single-use codes.
+- Session-only uploads by default; explicit opt-in Blob/Table persistence.
+- 30-day raw and 60-day normalized retention, plus export/delete controls.
+- A managed-identity Microsoft Foundry provider with per-user allowances and
+  a global monthly hard cap. Local mode continues using Copilot.
+- Container Apps Consumption with scale-to-zero and one maximum replica while
+  Streamlit state remains process-local.
+- Docker, AZD, Bicep, monitoring, RBAC, lifecycle, and budget definitions.
+
+Deployment remains phased: first validate the code and IaC; later deploy only
+the model to prove Visual Studio credit billing; deploy the website only after
+that proof succeeds.
+
 ## Other ideas
 
 Maybe someday, no commitments:
