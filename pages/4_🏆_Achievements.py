@@ -1,12 +1,10 @@
 """Achievements — full badge wall with unlocked + locked + progress."""
 from __future__ import annotations
 
-from pathlib import Path
 
-import pandas as pd
 import streamlit as st
 
-from iron_trail import analytics, config, sidebar, ui
+from iron_trail import analytics, sidebar, ui
 
 ui.setup_page("Achievements · IronTrail", "🏆")
 

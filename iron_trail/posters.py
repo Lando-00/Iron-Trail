@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import io
 from datetime import date
-from pathlib import Path
 from typing import Iterable
 
 import pandas as pd

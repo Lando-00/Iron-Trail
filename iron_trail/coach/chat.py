@@ -6,7 +6,7 @@ helpers for running a conversation against any ``Provider``.
 """
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import timedelta
 from typing import Any
 
 import pandas as pd

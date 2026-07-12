@@ -10,7 +10,6 @@ import os
 from datetime import date, timedelta
 from pathlib import Path
 
-import pandas as pd
 import streamlit as st
 
 from iron_trail import sidebar, ui

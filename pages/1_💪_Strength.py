@@ -1,13 +1,12 @@
 """Per-exercise estimated 1RM (e1RM) progression."""
 from __future__ import annotations
 
-from pathlib import Path
 
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from iron_trail import analytics, config, metrics, sidebar, theme, ui
+from iron_trail import analytics, metrics, posters, sidebar, theme, ui
 
 ui.setup_page("Strength · IronTrail", "💪")
 
@@ -125,9 +124,6 @@ c4.metric("Change since first", f"{last - first:+.1f} kg")
 
 # =====================================================================
 # PR Poster
-# =====================================================================
-from iron_trail import posters
-
 ui.section_title("📸 PR Poster")
 
 prs_for_ex = posters.find_recent_prs(df)

@@ -1,14 +1,13 @@
 """Volume page — weekly tonnage by muscle, push:pull ratio, movement radar."""
 from __future__ import annotations
 
-from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-from iron_trail import analytics, config, metrics, sidebar, theme, ui
+from iron_trail import analytics, metrics, sidebar, theme, ui
 
 ui.setup_page("Volume · IronTrail", "📊")
 

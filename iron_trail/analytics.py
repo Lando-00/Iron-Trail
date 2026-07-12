@@ -75,7 +75,7 @@ def plateau_status(df: pd.DataFrame, exercise: str, today: date | None = None) -
         )
     elif days_since <= 7:
         status = "fresh_pr"
-        msg = f"🔥 Fresh PR within the last week. Ride it."
+        msg = "🔥 Fresh PR within the last week. Ride it."
     elif days_since <= 21:
         status = "progressing"
         msg = f"↗ Progressing. Last PR {days_since} days ago. Stay the course."

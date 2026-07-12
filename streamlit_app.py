@@ -10,7 +10,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from iron_trail import analytics, config, metrics, sidebar, theme, ui
+from iron_trail import analytics, metrics, sidebar, theme, ui
 
 ui.setup_page("IronTrail", "🏋️")
 

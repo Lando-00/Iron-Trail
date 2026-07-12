@@ -119,8 +119,6 @@ def weekly_push_pull(df: pd.DataFrame) -> pd.DataFrame:
         .unstack(fill_value=0.0)
         .reset_index()
     )
-    push = pivot["push"] if "push" in pivot.columns else 0.0
-    pull = pivot["pull"] if "pull" in pivot.columns else 0.0
     if "push" not in pivot.columns:
         pivot["push"] = 0.0
     if "pull" not in pivot.columns:

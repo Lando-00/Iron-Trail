@@ -1,13 +1,12 @@
 """Adherence — archetype-coloured calendar, streaks, time-of-day, archetype mix."""
 from __future__ import annotations
 
-from pathlib import Path
 
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from iron_trail import analytics, config, metrics, sidebar, theme, ui
+from iron_trail import analytics, metrics, sidebar, theme, ui
 
 ui.setup_page("Adherence · IronTrail", "📅")
 

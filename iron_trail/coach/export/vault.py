@@ -1,7 +1,6 @@
 """Write a generated review to the user's Obsidian / markdown vault."""
 from __future__ import annotations
 
-from datetime import date
 from pathlib import Path
 
 

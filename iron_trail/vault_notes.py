@@ -11,7 +11,6 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import metrics
 
 
 def _frontmatter(d: dict) -> str:
@@ -32,7 +31,6 @@ def _session_to_markdown(g: pd.DataFrame) -> tuple[str, str]:
     workout_date = pd.to_datetime(g["workout_date"].iloc[0]).date()
     title = (g["title"].iloc[0] or "Untitled").strip()
     start_time = pd.to_datetime(g["start_time"].iloc[0])
-    end_time = pd.to_datetime(g["end_time"].iloc[0]) if pd.notna(g["end_time"].iloc[0]) else None
     duration_min = float(g["duration_min"].iloc[0] or 0)
 
     working = g[g["is_working"]]
