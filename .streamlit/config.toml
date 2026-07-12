@@ -10,6 +10,7 @@ runOnSave = true
 # Bind to localhost only — prevents broadcasting on the LAN.
 # Remove or set to "0.0.0.0" if you want devices on your network to access it.
 address = "localhost"
+maxUploadSize = 25
 
 [browser]
 gatherUsageStats = false

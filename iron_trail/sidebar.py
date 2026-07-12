@@ -15,6 +15,7 @@ import streamlit as st
 
 from . import auth, config, ingest, runtime
 from .cloud_storage import CloudStorageError, DatasetRecord, get_dataset_repository
+from .uploads import UploadValidationError
 
 
 def _csv_choices() -> list[str]:
@@ -37,13 +38,13 @@ def _load_from_bytes(content: bytes, _filename: str, body_weight_kg: float) -> p
 
 def render_data_source() -> tuple[pd.DataFrame, str, float]:
     """Render the IronTrail sidebar. Returns (df, source_label, body_weight_kg)."""
-    if runtime.is_cloud():
-        try:
+    try:
+        if runtime.is_cloud():
             return _render_cloud_data_source()
-        except (CloudStorageError, runtime.ConfigurationError) as exc:
-            st.error(str(exc))
-            st.stop()
-    return _render_local_data_source()
+        return _render_local_data_source()
+    except (CloudStorageError, UploadValidationError, runtime.ConfigurationError) as exc:
+        st.error(str(exc))
+        st.stop()
 
 
 def _render_local_data_source() -> tuple[pd.DataFrame, str, float]:

@@ -13,16 +13,34 @@ The returned DataFrame is the canonical wide table used by every page.
 """
 from __future__ import annotations
 
+import csv
 import functools
+import io
 from pathlib import Path
 
 import dateparser
 import pandas as pd
 
-from . import config
+from . import config, runtime
 from .normalize import normalize_exercise_title
+from .uploads import UploadValidationError, read_bounded_bytes
 
 WORKING_SET_TYPES = {"normal", "failure", "dropset"}
+HEVY_REQUIRED_COLUMNS = {
+    "title",
+    "start_time",
+    "end_time",
+    "exercise_title",
+    "set_index",
+    "set_type",
+    "weight_kg",
+    "reps",
+}
+HEVY_OPTIONAL_DEFAULTS = {
+    "description": "",
+    "exercise_notes": "",
+    "superset_id": pd.NA,
+}
 
 
 @functools.lru_cache(maxsize=4096)
@@ -46,9 +64,36 @@ def load_exercise_map(path: Path | None = None) -> pd.DataFrame:
     return pd.read_csv(path)
 
 
-def load_hevy_csv(source) -> pd.DataFrame:
+def load_hevy_csv(
+    source,
+    *,
+    max_bytes: int | None = None,
+    max_rows: int | None = None,
+) -> pd.DataFrame:
     """Load a Hevy export from a path, string, or file-like / BytesIO source."""
-    df = pd.read_csv(source)
+    byte_limit = max_bytes or runtime.env_int(
+        "IRONTRAIL_MAX_CSV_BYTES", 25 * 1024 * 1024, minimum=1
+    )
+    row_limit = max_rows or runtime.env_int(
+        "IRONTRAIL_MAX_CSV_ROWS", 250_000, minimum=1
+    )
+    payload = read_bounded_bytes(source, max_bytes=byte_limit)
+    _validate_header(payload)
+    try:
+        df = pd.read_csv(io.BytesIO(payload), nrows=row_limit + 1)
+    except (UnicodeDecodeError, pd.errors.EmptyDataError, pd.errors.ParserError) as exc:
+        raise UploadValidationError("The file is not a valid Hevy CSV export.") from exc
+    if len(df) > row_limit:
+        raise UploadValidationError(f"The Hevy export exceeds the {row_limit:,}-row limit.")
+
+    missing = sorted(HEVY_REQUIRED_COLUMNS - set(df.columns))
+    if missing:
+        raise UploadValidationError(
+            "The Hevy CSV is missing required columns: " + ", ".join(missing)
+        )
+    for column, default in HEVY_OPTIONAL_DEFAULTS.items():
+        if column not in df.columns:
+            df[column] = default
     df["exercise_title"] = df["exercise_title"].astype(str).map(normalize_exercise_title)
     return df
 
@@ -115,3 +160,14 @@ def load_and_clean(
     raw = load_hevy_csv(csv_source)
     emap = load_exercise_map()
     return clean(raw, emap, body_weight_kg=body_weight_kg)
+
+
+def _validate_header(payload: bytes) -> None:
+    try:
+        first_line = payload.decode("utf-8-sig").splitlines()[0]
+        columns = next(csv.reader([first_line]))
+    except (UnicodeDecodeError, IndexError, csv.Error) as exc:
+        raise UploadValidationError("The file is not a valid UTF-8 CSV export.") from exc
+    normalized = [column.strip() for column in columns]
+    if len(normalized) != len(set(normalized)):
+        raise UploadValidationError("The CSV header contains duplicate column names.")
