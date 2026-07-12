@@ -26,6 +26,10 @@ Thumbs.db
 # Streamlit
 .streamlit/secrets.toml
 
+# Azure Developer CLI environment state (can contain deployment settings/secrets)
+.azure/*
+!.azure/deployment-plan.md
+
 # Markdown writeback output — generated training notes, user-specific
 vault-output/
 
