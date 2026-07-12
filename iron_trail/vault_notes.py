@@ -6,6 +6,8 @@ breakdown. Idempotent — re-running overwrites notes with the latest data.
 """
 from __future__ import annotations
 
+import io
+import zipfile
 from datetime import date
 from pathlib import Path
 
@@ -129,3 +131,16 @@ def write_daily_notes(
         "total": int(df["workout_id"].nunique()),
         "target_dir": str(target_dir),
     }
+
+
+def daily_notes_archive(df: pd.DataFrame, *, since: date | None = None) -> bytes:
+    """Return all selected workout notes as an in-memory ZIP archive."""
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for _, group in df.groupby("workout_id"):
+            workout_date = pd.to_datetime(group["workout_date"].iloc[0]).date()
+            if since is not None and workout_date < since:
+                continue
+            filename, content = _session_to_markdown(group)
+            archive.writestr(f"Hevy/Daily/{filename}", content)
+    return output.getvalue()

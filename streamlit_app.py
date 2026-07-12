@@ -36,6 +36,22 @@ with st.sidebar:
         do_vault_write = st.button("📝 Generate daily notes")
     else:
         do_vault_write = False
+        st.divider()
+        st.markdown("**Markdown export**")
+        vault_since = st.date_input(
+            "From date",
+            value=pd.Timestamp.now().normalize().date() - pd.Timedelta(days=30),
+            key="cloud_notes_since",
+        )
+        from iron_trail import vault_notes
+
+        st.download_button(
+            "Download daily notes (.zip)",
+            data=vault_notes.daily_notes_archive(df, since=vault_since),
+            file_name="irontrail-daily-notes.zip",
+            mime="application/zip",
+            use_container_width=True,
+        )
 
 if do_vault_write:
     from iron_trail import vault_notes
