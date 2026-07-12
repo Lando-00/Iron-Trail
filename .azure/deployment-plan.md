@@ -1,6 +1,6 @@
 # IronTrail Azure Deployment Plan
 
-> **Status:** Stage A complete - Foundry credit proof pending
+> **Status:** Stage A pushed - Foundry credit proof pending
 
 Generated: 2026-07-11  
 Last verified: 2026-07-12
@@ -38,6 +38,7 @@ domain in the first release.
 | Model deployments | None |
 | Hosting branch | `feature/azure-hosting` |
 | Stage A implementation | Complete and locally validated |
+| Remote branch | Pushed at `748501a` without merging |
 
 The Samsung commit remains local until a later explicit push approval. The
 public repository must never contain a real Hevy, Samsung Health, Health
@@ -490,7 +491,7 @@ Autopilot must stop before:
 - [x] Add Dockerfile, `azure.yaml`, and Bicep modules.
 - [x] Configure Easy Auth, managed identity, RBAC, budgets, and monitoring.
 - [x] Compile and validate Bicep/AZD without provisioning.
-- [ ] Push `feature/azure-hosting`; do not merge.
+- [x] Push `feature/azure-hosting`; do not merge.
 
 ### Stage B: Foundry credit proof - later explicit stage
 
@@ -571,6 +572,7 @@ to `Validated`.
 
 ## 14. Next Step
 
-Push the validated Stage A feature branch without merging it. The next
-separately approved stage deploys only `gpt-5-mini` and verifies Visual Studio
-credit billing before any website infrastructure.
+Begin the separately approved Foundry credit-proof stage: verify the spending
+limit, deploy only `gpt-5-mini` into the existing Foundry project, make one
+bounded synthetic call, and confirm Visual Studio credit billing before any
+website infrastructure.
