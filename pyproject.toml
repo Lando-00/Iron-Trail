@@ -11,7 +11,6 @@ dependencies = [
     "numpy>=1.26",
     "pyarrow>=17.0",
     "scikit-learn>=1.4",
-    "github-copilot-sdk>=0.3",
     "markdown>=3.5",
     "xhtml2pdf>=0.2.16",
     "Pillow>=10.0",
@@ -20,9 +19,11 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["ruff>=0.4", "pytest>=8.0", "playwright>=1.50"]
 ai = ["openai>=1.30"]
+local = ["github-copilot-sdk>=0.3"]
 cloud = [
     "azure-data-tables>=12.7",
     "azure-identity>=1.19",
+    "azure-monitor-opentelemetry>=1.6",
     "azure-storage-blob>=12.24",
     "openai>=1.60",
 ]

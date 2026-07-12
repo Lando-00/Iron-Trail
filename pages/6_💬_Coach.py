@@ -28,7 +28,7 @@ from iron_trail.usage_limits import (
 )
 
 ui.setup_page("Coach · IronTrail", "💬")
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("iron_trail.coach.page")
 
 
 with st.sidebar:
