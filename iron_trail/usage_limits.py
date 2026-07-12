@@ -133,9 +133,10 @@ class AzureUsageRepository:
 
     def complete(self, event: UsageEvent) -> None:
         from azure.core.exceptions import AzureError
+        from azure.data.tables import UpdateMode
 
         try:
-            self._table.update_entity(_event_to_entity(event), mode="replace")
+            self._table.update_entity(_event_to_entity(event), mode=UpdateMode.REPLACE)
         except AzureError as exc:
             raise UsageRepositoryError("Unable to record AI usage.") from exc
 
@@ -379,4 +380,3 @@ def _entity_to_event(entity: Any) -> UsageEvent:
         cost_eur=float(entity["costEur"]),
         created_at=created_at.astimezone(UTC),
     )
-
