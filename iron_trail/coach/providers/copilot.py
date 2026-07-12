@@ -15,7 +15,7 @@ import atexit
 import threading
 from typing import Any
 
-from . import Message
+from . import Message, TokenUsage
 
 
 _PromptText = str
@@ -23,6 +23,7 @@ _PromptText = str
 
 class CopilotProvider:
     name = "copilot"
+    last_usage: TokenUsage | None = None
 
     def __init__(self) -> None:
         self._loop: asyncio.AbstractEventLoop | None = None

@@ -19,10 +19,17 @@ class Message:
     content: str
 
 
+@dataclass(frozen=True)
+class TokenUsage:
+    input_tokens: int
+    output_tokens: int
+
+
 class Provider(Protocol):
     """Synchronous interface for a chat-completion-style LLM call."""
 
     name: str
+    last_usage: TokenUsage | None
 
     def chat(self, messages: list[Message], *, timeout: float = 120.0) -> str:
         """Send messages, return the assistant's reply text."""

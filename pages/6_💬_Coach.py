@@ -6,19 +6,29 @@ Obsidian vault (or downloading as Markdown / PDF) is one click away.
 """
 from __future__ import annotations
 
+import logging
 import os
 from datetime import date, timedelta
 from pathlib import Path
 
 import streamlit as st
 
-from iron_trail import sidebar, ui
+from iron_trail import auth, runtime, sidebar, ui
 from iron_trail.coach import prompts, render, summary
-from iron_trail.coach.export.vault import save_weekly_review, save_monthly_review
+from iron_trail.coach.export.vault import save_monthly_review, save_weekly_review
 from iron_trail.coach.providers import Message
 from iron_trail.coach.providers.mock import MockProvider
+from iron_trail.usage_limits import (
+    CallKind,
+    LimitedProvider,
+    UsageLimiter,
+    UsageLimitExceeded,
+    UsageRepositoryError,
+    get_usage_repository,
+)
 
 ui.setup_page("Coach · IronTrail", "💬")
+logger = logging.getLogger(__name__)
 
 
 with st.sidebar:
@@ -26,17 +36,53 @@ with st.sidebar:
 
 
 @st.cache_resource(show_spinner=False)
-def _get_real_provider():
+def _get_copilot_provider():
     # Cached so the Copilot CLI server isn't re-spawned on every Streamlit rerun.
     from iron_trail.coach.providers.copilot import CopilotProvider
 
     return CopilotProvider()
 
 
-def get_provider():
+@st.cache_resource(show_spinner=False)
+def _get_foundry_provider():
+    from iron_trail.coach.providers.azure_foundry import AzureFoundryProvider
+
+    return AzureFoundryProvider()
+
+
+@st.cache_resource(show_spinner=False)
+def _get_usage_limiter():
+    return UsageLimiter(get_usage_repository())
+
+
+def get_provider(kind: CallKind):
+    if runtime.is_cloud():
+        return LimitedProvider(
+            _get_foundry_provider(),
+            _get_usage_limiter(),
+            auth.current_user().user_id,
+            kind,
+        )
     if os.environ.get("COACH_LLM", "").lower() == "mock":
         return MockProvider()
-    return _get_real_provider()
+    return _get_copilot_provider()
+
+
+def call_coach(messages: list[Message], kind: CallKind, timeout: float) -> str:
+    try:
+        return get_provider(kind).chat(messages, timeout=timeout)
+    except UsageLimitExceeded as exc:
+        st.warning(str(exc))
+    except UsageRepositoryError:
+        logger.exception("Coach usage ledger failed")
+        st.error("The hosted Coach could not verify its usage allowance.")
+    except Exception as exc:
+        logger.exception("Coach provider call failed")
+        if runtime.is_cloud():
+            st.error("The hosted Coach is temporarily unavailable.")
+        else:
+            st.error(f"Coach call failed: {exc}")
+    st.stop()
 
 
 # Personality dropdown
@@ -47,7 +93,8 @@ if "coach_personality" not in st.session_state:
 st.title("💬 Coach")
 st.caption(
     "AI-written training reviews and an 'ask your data' chat — "
-    "all backed by your loaded Hevy data, all powered by Copilot."
+    "all backed by your loaded Hevy data, powered by "
+    f"{'Microsoft Foundry' if runtime.is_cloud() else 'Copilot'}."
 )
 
 header_l, header_r = st.columns([3, 1])
@@ -90,13 +137,11 @@ with tabs[0]:
             prompt = prompts.weekly_review_prompt(
                 week_summary, personality=st.session_state["coach_personality"]
             )
-            provider = get_provider()
-            try:
-                body = provider.chat([Message(role="system", content=prompt)],
-                                     timeout=180.0)
-            except Exception as e:
-                st.error(f"Coach call failed: {e}")
-                st.stop()
+            body = call_coach(
+                [Message(role="system", content=prompt)],
+                CallKind.REVIEW,
+                180.0,
+            )
         md = render.weekly_review_md(
             week_summary, body,
             personality=st.session_state["coach_personality"],
@@ -119,20 +164,27 @@ with tabs[0]:
         st.markdown("</div>", unsafe_allow_html=True)
 
         ui.section_title("Export")
-        ec1, ec2, ec3, ec4 = st.columns([2, 1, 1, 1])
-        with ec1:
-            vault_path = st.text_input(
-                "Vault path",
-                value="vault-output",
-                key="coach_vault_path",
-                help="Saves to <vault>/Hevy/Reviews/YYYY-Www.md",
-            )
-            if st.button("💾 Save to Vault", use_container_width=True, key="save_weekly_vault"):
-                try:
-                    out = save_weekly_review(md, Path(vault_path), label)
-                    st.success(f"✓ Saved → `{out}`")
-                except Exception as e:
-                    st.error(f"Save failed: {e}")
+        if runtime.is_cloud():
+            ec2, ec3, ec4 = st.columns(3)
+        else:
+            ec1, ec2, ec3, ec4 = st.columns([2, 1, 1, 1])
+            with ec1:
+                vault_path = st.text_input(
+                    "Vault path",
+                    value="vault-output",
+                    key="coach_vault_path",
+                    help="Saves to <vault>/Hevy/Reviews/YYYY-Www.md",
+                )
+                if st.button(
+                    "💾 Save to Vault",
+                    use_container_width=True,
+                    key="save_weekly_vault",
+                ):
+                    try:
+                        out = save_weekly_review(md, Path(vault_path), label)
+                        st.success(f"✓ Saved → `{out}`")
+                    except OSError as exc:
+                        st.error(f"Save failed: {exc}")
         with ec2:
             st.download_button(
                 "⬇️ .md",
@@ -194,13 +246,11 @@ with tabs[1]:
             prompt = prompts.monthly_review_prompt(
                 month_summary, personality=st.session_state["coach_personality"]
             )
-            provider = get_provider()
-            try:
-                body = provider.chat([Message(role="system", content=prompt)],
-                                     timeout=240.0)
-            except Exception as e:
-                st.error(f"Coach call failed: {e}")
-                st.stop()
+            body = call_coach(
+                [Message(role="system", content=prompt)],
+                CallKind.REVIEW,
+                240.0,
+            )
         md = render.monthly_review_md(
             month_summary, body,
             personality=st.session_state["coach_personality"],
@@ -221,19 +271,26 @@ with tabs[1]:
         st.markdown("</div>", unsafe_allow_html=True)
 
         ui.section_title("Export")
-        ec1, ec2, ec3, ec4 = st.columns([2, 1, 1, 1])
-        with ec1:
-            vault_path = st.text_input(
-                "Vault path",
-                value="vault-output",
-                key="coach_monthly_vault_path",
-            )
-            if st.button("💾 Save to Vault", use_container_width=True, key="save_monthly_vault"):
-                try:
-                    out = save_monthly_review(md, Path(vault_path), label)
-                    st.success(f"✓ Saved → `{out}`")
-                except Exception as e:
-                    st.error(f"Save failed: {e}")
+        if runtime.is_cloud():
+            ec2, ec3, ec4 = st.columns(3)
+        else:
+            ec1, ec2, ec3, ec4 = st.columns([2, 1, 1, 1])
+            with ec1:
+                vault_path = st.text_input(
+                    "Vault path",
+                    value="vault-output",
+                    key="coach_monthly_vault_path",
+                )
+                if st.button(
+                    "💾 Save to Vault",
+                    use_container_width=True,
+                    key="save_monthly_vault",
+                ):
+                    try:
+                        out = save_monthly_review(md, Path(vault_path), label)
+                        st.success(f"✓ Saved → `{out}`")
+                    except OSError as exc:
+                        st.error(f"Save failed: {exc}")
         with ec2:
             st.download_button(
                 "⬇️ .md",
@@ -308,13 +365,9 @@ with tabs[2]:
             context=ctx,
             personality=st.session_state["coach_personality"],
         )
-        provider = get_provider()
         with st.chat_message("assistant"):
             with st.spinner("Thinking…"):
-                try:
-                    reply = provider.chat(messages, timeout=180.0)
-                except Exception as e:
-                    reply = f"_Coach call failed: {e}_"
+                reply = call_coach(messages, CallKind.CHAT, 180.0)
             st.markdown(reply)
         st.session_state["coach_chat_history"].append(("assistant", reply))
 
@@ -332,16 +385,33 @@ with tabs[3]:
 
     st.divider()
     st.markdown("### Provider")
-    provider_name = os.environ.get("COACH_LLM", "real")
-    if provider_name == "mock":
-        st.warning("Currently using the **MOCK** provider (set `COACH_LLM=real` to use Copilot).")
+    if runtime.is_cloud():
+        deployment = os.environ.get("IRONTRAIL_AZURE_OPENAI_DEPLOYMENT", "not configured")
+        st.success(f"Using **Microsoft Foundry** deployment `{deployment}`.")
+        try:
+            usage = _get_usage_limiter().snapshot(auth.current_user().user_id)
+        except UsageRepositoryError:
+            st.warning("Usage counters are temporarily unavailable.")
+        else:
+            st.markdown(
+                f"- Reviews today/month: **{usage.review_daily} / {usage.review_monthly}**\n"
+                f"- Chat calls today/month: **{usage.chat_daily} / {usage.chat_monthly}**\n"
+                f"- Estimated global AI spend this month: "
+                f"**€{usage.global_monthly_cost_eur:.4f}**"
+            )
     else:
-        st.success("Using the **Copilot SDK** via your Copilot Pro subscription.")
-    st.caption(
-        "Set the environment variable `COACH_LLM=mock` before launching "
-        "Streamlit to develop without burning tokens. The mock returns a "
-        "deterministic canned response."
-    )
+        provider_name = os.environ.get("COACH_LLM", "real")
+        if provider_name == "mock":
+            st.warning(
+                "Currently using the **MOCK** provider "
+                "(set `COACH_LLM=real` to use Copilot)."
+            )
+        else:
+            st.success("Using the **Copilot SDK** via your Copilot subscription.")
+        st.caption(
+            "Set `COACH_LLM=mock` before launching Streamlit to develop without "
+            "using Copilot. The mock returns a deterministic response."
+        )
 
     st.divider()
     st.markdown("### Data source")

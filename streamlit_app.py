@@ -10,28 +10,32 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from iron_trail import analytics, metrics, sidebar, theme, ui
+from iron_trail import analytics, metrics, runtime, sidebar, theme, ui
 
 ui.setup_page("IronTrail", "🏋️")
 
 
 with st.sidebar:
     df, source_label, body_weight = sidebar.render_data_source()
-    st.divider()
-    st.markdown("**Markdown writeback**")
-    vault_path = st.text_input(
-        "Output directory",
-        value="vault-output",
-        help=(
-            "Each workout becomes <dir>/Hevy/Daily/YYYY-MM-DD.md. "
-            "Point this at your Obsidian vault (or Logseq, or any folder). "
-            "Defaults to ./vault-output/ in the repo for a quick demo."
-        ),
-    )
-    vault_since = st.date_input(
-        "From date", value=pd.Timestamp.now().normalize().date() - pd.Timedelta(days=30),
-    )
-    do_vault_write = st.button("📝 Generate daily notes")
+    if not runtime.is_cloud():
+        st.divider()
+        st.markdown("**Markdown writeback**")
+        vault_path = st.text_input(
+            "Output directory",
+            value="vault-output",
+            help=(
+                "Each workout becomes <dir>/Hevy/Daily/YYYY-MM-DD.md. "
+                "Point this at your Obsidian vault (or Logseq, or any folder). "
+                "Defaults to ./vault-output/ in the repo for a quick demo."
+            ),
+        )
+        vault_since = st.date_input(
+            "From date",
+            value=pd.Timestamp.now().normalize().date() - pd.Timedelta(days=30),
+        )
+        do_vault_write = st.button("📝 Generate daily notes")
+    else:
+        do_vault_write = False
 
 if do_vault_write:
     from iron_trail import vault_notes

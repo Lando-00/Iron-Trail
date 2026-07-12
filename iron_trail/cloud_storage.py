@@ -440,6 +440,10 @@ def get_dataset_repository() -> AzureDatasetRepository:
     return AzureDatasetRepository.from_environment()
 
 
+def azure_table_client(table_name: str) -> Any:
+    return _table_client(_required_env("IRONTRAIL_STORAGE_TABLE_URL"), table_name)
+
+
 def sanitize_filename(filename: str) -> str:
     name = Path(filename).name[:120]
     cleaned = _SAFE_FILENAME.sub("_", name).strip("._")

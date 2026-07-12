@@ -5,7 +5,7 @@ prompt so different review-kinds produce noticeably different stubs.
 """
 from __future__ import annotations
 
-from . import Message
+from . import Message, TokenUsage
 
 
 _WEEKLY_STUB = """\
@@ -66,6 +66,7 @@ real.
 
 class MockProvider:
     name = "mock"
+    last_usage: TokenUsage | None = None
 
     def chat(self, messages: list[Message], *, timeout: float = 120.0) -> str:
         sys_prompt = next((m.content for m in messages if m.role == "system"), "")
