@@ -1,9 +1,9 @@
 # IronTrail Azure Deployment Plan
 
-> **Status:** Stage A pushed - Foundry credit proof pending
+> **Status:** Stage B planned - awaiting execution approval
 
 Generated: 2026-07-11  
-Last verified: 2026-07-12
+Last verified: 2026-07-13
 
 ---
 
@@ -38,7 +38,7 @@ domain in the first release.
 | Model deployments | None |
 | Hosting branch | `feature/azure-hosting` |
 | Stage A implementation | Complete and locally validated |
-| Remote branch | Pushed at `748501a` without merging |
+| Remote branch | Pushed at `e73766b` without merging |
 
 The Samsung commit remains local until a later explicit push approval. The
 public repository must never contain a real Hevy, Samsung Health, Health
@@ -87,7 +87,7 @@ Still deferred:
 | Normalized retention | 60 days |
 | AI budget behavior | Disable hosted AI until the next month when the hard cap is reached |
 | Custom domain | Deferred |
-| Current execution scope | Code and infrastructure definitions only; no Azure deployment |
+| Current execution scope | Stage B only: one model deployment, synthetic calls, and read-only billing checks |
 
 ### Policy constraints
 
@@ -371,15 +371,189 @@ Cost controls:
 - Azure MCP cannot prove the current Visual Studio credit balance. Before the
   website is provisioned, the later Azure stage must verify that the
   subscription spending limit is enabled, deploy only the minimal Foundry
-  resources, make one tiny metered request, and confirm the cost appears
-  against this subscription.
+  model, run the approved ten-call synthetic proof, and confirm the cost
+  appears against this subscription.
 - Visual Studio credits are for development/testing and do not provide a
   production SLA. They are appropriate for this five-user private beta, not a
   later public production service.
 
+### Stage B verified baseline (2026-07-13)
+
+| Check | Current state |
+|---|---|
+| Subscription | Visual Studio Enterprise Subscription, enabled |
+| CLI spending-limit field | Not exposed (`null`); Azure billing portal check required |
+| Foundry account/project | `irontrail-resource` / `irontrail`, Sweden Central, succeeded |
+| Existing model deployments | None |
+| Model | `gpt-5-mini`, version `2025-08-07`, OpenAI, Generally Available |
+| Supported SKU | `DataZoneStandard` confirmed live |
+| Subscription quota | 300K TPM allocated, 0 used |
+| Platform capacity | 300K TPM available in Sweden Central |
+| Proof allocation | 10K TPM, leaving 290K TPM unallocated |
+| RAI policy | `Microsoft.DefaultV2` exists |
+| Invoking identity | Inherited `Foundry User` plus subscription `Owner` |
+| `rg-IronTrail` month-to-date cost | No cost rows |
+| Subscription month-to-date cost | About EUR 0.1027, entirely Cloud Shell Storage |
+
 ---
 
-## 8. Health Integration Roadmap
+## 8. Stage B Foundry Credit-Proof Plan
+
+### Scope
+
+Stage B may mutate exactly one existing Azure resource surface:
+
+- Create one deployment named `gpt-5-mini` under the existing
+  `irontrail-resource` account.
+- Run ten synthetic-only inference calls.
+
+It must not provision Container Apps, ACR, Storage, Key Vault, monitoring,
+identity, DNS, networking, or any other website resource. It must not merge a
+branch or use real workout/health data.
+
+### Confirmed deployment configuration
+
+| Setting | Value |
+|---|---|
+| Account/project | `irontrail-resource` / `irontrail` |
+| Region | Sweden Central |
+| Deployment name | `gpt-5-mini` |
+| Model/version | `gpt-5-mini` / `2025-08-07` |
+| Format | OpenAI |
+| SKU | DataZoneStandard |
+| Capacity | 10 (10K TPM) |
+| Content filter | `Microsoft.DefaultV2` |
+| Version upgrade | `OnceCurrentVersionExpired` |
+| Dynamic quota | Not applicable to DataZoneStandard |
+| Spillover | Disabled |
+
+The deployment is created with one explicit ARM `PUT` using API
+`2024-10-01`, including the SKU, model version, RAI policy, and version-upgrade
+option in the same idempotent request.
+
+### Preflight gate
+
+Before the deployment:
+
+1. Use Browser Companion to inspect Azure Cost Management/Billing.
+2. Match both subscription name and subscription ID to the deployment target.
+3. Proceed only if the portal shows either:
+   - an explicit **spending limit enabled/on** indicator for that subscription,
+     or
+   - an explicit remaining monthly credit amount greater than the EUR 0.05
+     proof ceiling.
+4. Record the exact qualifying indicator and remaining credit if visible.
+5. Capture the current authoritative Azure input/output token rates for
+   `gpt-5-mini` DataZoneStandard.
+6. Calculate the ten-call worst case:
+   `0.02 × input-price-per-million + 0.003 × output-price-per-million`,
+   converted to EUR with a 20% safety buffer when Azure displays another
+   currency. Stop unless the result is at most EUR 0.05.
+7. Re-query model, quota, capacity, RAI policy, existing deployments, and
+   `rg-IronTrail` cost immediately before mutation.
+8. Stop if the target, SKU, model version, quota, pricing, or billing guardrail differs
+   from this plan.
+
+The billing inspection is read-only. Stage B must not remove or change the
+spending limit, payment method, subscription offer, or billing settings.
+If the qualifying billing indicator is not visible before deployment, stop
+without creating the model deployment.
+
+### Deployment and validation
+
+1. Persist a deployment intent in the proof ledger before submitting the PUT.
+2. Assert that deployment name `gpt-5-mini` still does not exist. Never
+   overwrite or silently adopt an unexpected deployment.
+3. Submit the exact deployment payload once.
+4. Poll until `Succeeded` or the initial five-minute timeout.
+5. On timeout or ambiguous response, do not repeat the PUT. Read the deployment
+   back and continue bounded read-only state polling for up to 15 minutes.
+   If state remains ambiguous, stop for manual review.
+6. Read the deployed resource back and verify every configured field.
+7. Verify quota usage moved from 0 to 10 units for
+   `OpenAI.DataZoneStandard.gpt-5-mini`.
+8. Allow bounded read-only quota convergence polling; do not run inference
+   until the exact 10-unit delta is visible.
+9. Confirm no other deployment or Azure resource appeared.
+
+If creation fails, capture the Azure error and stop. Do not retry with another
+region, SKU, model version, capacity, or content policy without a new plan.
+
+### Synthetic proof protocol
+
+- Add a small reusable proof script on `feature/azure-hosting`.
+- Authenticate with `AzureCliCredential`, binding proof traffic to the exact
+  CLI tenant/user context captured in preflight; never read or copy the portal
+  API key.
+- Use the existing `AzureFoundryProvider`.
+- Create a persistent proof ledger outside the repository before call 1. It
+  contains a random `proof_run_id`, deployment configuration, pricing snapshot,
+  each call index/status, request ID when returned, token usage, timestamps,
+  and cost estimate. It never stores prompt or response prose.
+- On resume, continue from the ledger. A call with a returned request ID or an
+  uncertain timeout counts as consumed and is never replayed merely to reach
+  ten calls.
+- Send ten sequential synthetic prompts containing no Hevy, health, identity,
+  Vault, or user data.
+- Give each prompt a unique synthetic nonce so the calls are independently
+  metered.
+- Bound each request to at most 2,000 input tokens and 300 output tokens;
+  prompts should normally be much smaller.
+- Use short factual formatting tasks rather than fitness or medical advice.
+- Respect 429 retry guidance and stop after the first non-transient failure.
+- Record deployment, request count, prompt/completion tokens, timestamps,
+  response IDs where available, and estimated cost. Do not persist response
+  prose.
+- Hard proof-call ceiling: EUR 0.05. Stop before a request that could exceed it.
+
+### Billing verification
+
+Success requires both:
+
+1. The preflight billing portal confirms the Visual Studio credit/spending
+   guardrail.
+2. A Microsoft Foundry/Azure OpenAI cost record attributable to
+   `rg-IronTrail` appears in Cost Management within 24 hours.
+
+Cost ingestion can be delayed. After the calls:
+
+- Query immediately, then at bounded read-only checkpoints up to 24 hours.
+- Filter Cost Management to `rg-IronTrail` (and the AIServices resource where
+  supported), group by service/resource, and record the exact query filter.
+  Do not treat unrelated subscription-level Cloud Shell Storage cost as proof.
+- Compare against the zero-cost `rg-IronTrail` baseline and the captured token totals.
+- Stop the checks as soon as the Foundry charge appears.
+- Do not generate extra calls merely to make the cost more visible.
+- If asynchronous execution is needed, create a read-only four-hour check
+  schedule with the 24-hour deadline embedded in its prompt; stop that schedule
+  immediately on success or deadline.
+
+### Outcomes
+
+**Success**
+
+- Keep the `gpt-5-mini` deployment for Stage C.
+- Stop all proof calls.
+- Record the proof in this plan and the Vault project note.
+- Unblock Stage C planning, but do not deploy the website automatically.
+
+**Credits or spending guardrail cannot be confirmed**
+
+- If this occurs before deployment, create nothing and stop.
+- If it occurs after deployment/calls, keep the model deployment present but
+  disabled by policy: make no further calls.
+- Keep Stage C blocked.
+- Record the unresolved billing evidence and stop.
+
+**Unexpected direct charge, wrong subscription, or guardrail regression**
+
+- Make no further calls.
+- Keep Stage C blocked.
+- Do not alter billing settings or proceed to website deployment.
+
+---
+
+## 9. Health Integration Roadmap
 
 ### Samsung Health
 
@@ -418,7 +592,7 @@ Planned heart-rate surfaces:
 
 ---
 
-## 9. Autopilot Execution Contract
+## 10. Autopilot Execution Contract
 
 ### Approved now: Stage A, code-first
 
@@ -437,15 +611,20 @@ Autopilot must leave `scripts/spike_copilot_sdk.py` and
 `scripts/test_pdf_output.pdf` untouched and uncommitted. It must not merge the
 feature branch.
 
-### Deferred: Stage B, Foundry credit proof
+### Approved Stage B boundary
 
-No Azure resource is created during Stage A. A later explicit Azure stage will:
+The user approved:
 
-1. Verify the Visual Studio credit/spending-limit state.
-2. Reuse the existing `rg-IronTrail`, `irontrail-resource`, and `irontrail`
-   project and create only the `gpt-5-mini` DataZoneStandard deployment.
-3. Make one bounded test call.
-4. Confirm billing and quota behavior before continuing.
+- The exact deployment configuration in
+  [Confirmed deployment configuration](#confirmed-deployment-configuration).
+- Ten bounded synthetic proof calls.
+- Browser Companion billing inspection.
+- Read-only Cost Management checks for up to 24 hours.
+- Keeping the deployment after success.
+- Keeping it deployed but making no further calls if the billing guardrail
+  cannot be confirmed.
+
+No website deployment is approved by this Stage B authority.
 
 ### Deferred: Stage C, website deployment
 
@@ -468,7 +647,7 @@ Autopilot must stop before:
 
 ---
 
-## 10. Execution Checklist
+## 11. Execution Checklist
 
 ### Phase 1: Planning
 
@@ -493,12 +672,18 @@ Autopilot must stop before:
 - [x] Compile and validate Bicep/AZD without provisioning.
 - [x] Push `feature/azure-hosting`; do not merge.
 
-### Stage B: Foundry credit proof - later explicit stage
+### Stage B: Foundry credit proof
 
 - [ ] Confirm spending limit and remaining Visual Studio benefit.
-- [ ] Invoke `azure-validate` for the minimal Foundry deployment.
-- [ ] Reuse the existing Foundry account/project and deploy only `gpt-5-mini`.
-- [ ] Make one tiny request and verify Cost Management/credit behavior.
+- [ ] Capture authoritative live token prices and prove the ten-call worst case is <= EUR 0.05.
+- [ ] Revalidate model, DataZoneStandard quota/capacity, RAI policy, and target.
+- [ ] Add and test the synthetic credit-proof script.
+- [ ] Validate the exact one-resource deployment payload.
+- [ ] Deploy `gpt-5-mini` at 10K TPM and verify its full configuration.
+- [ ] Verify quota changed by exactly 10K TPM.
+- [ ] Run ten bounded, resumable synthetic calls and record token usage.
+- [ ] Check Cost Management immediately and at bounded checkpoints up to 24h.
+- [ ] Record success or the no-further-calls failure state.
 
 ### Stage C: Full validation and website deployment - later explicit stage
 
@@ -518,7 +703,7 @@ Autopilot must stop before:
 
 ---
 
-## 11. Validation Proof
+## 12. Validation Proof
 
 The `azure-validate` skill must populate this section before the plan can move
 to `Validated`.
@@ -539,7 +724,7 @@ to `Validated`.
 
 ---
 
-## 12. Files to Generate
+## 13. Files to Generate
 
 | File/component | Purpose | Status |
 |---|---|---|
@@ -555,7 +740,7 @@ to `Validated`.
 
 ---
 
-## 13. Git and Release Boundary
+## 14. Git and Release Boundary
 
 - Do not push the Samsung commit yet.
 - Do not amend or squash the existing Samsung commit.
@@ -570,9 +755,8 @@ to `Validated`.
 
 ---
 
-## 14. Next Step
+## 15. Next Step
 
-Begin the separately approved Foundry credit-proof stage: verify the spending
-limit, deploy only `gpt-5-mini` into the existing Foundry project, make one
-bounded synthetic call, and confirm Visual Studio credit billing before any
-website infrastructure.
+Execute the Stage B preflight. The first mutation is forbidden until the
+billing portal, target, model, SKU, quota, capacity, RAI policy, and empty
+deployment list all match this plan.
