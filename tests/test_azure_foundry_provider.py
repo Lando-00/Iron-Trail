@@ -15,6 +15,8 @@ class FakeCompletions:
         return SimpleNamespace(
             choices=[SimpleNamespace(message=SimpleNamespace(content="grounded response"))],
             usage=SimpleNamespace(prompt_tokens=321, completion_tokens=123),
+            id="completion-123",
+            _request_id="request-123",
         )
 
 
@@ -49,4 +51,5 @@ def test_foundry_provider_uses_deployment_and_tracks_usage() -> None:
     assert client.completions.kwargs["max_completion_tokens"] == 700
     assert "tools" not in client.completions.kwargs
     assert provider.last_usage == TokenUsage(321, 123)
-
+    assert provider.last_request_id == "request-123"
+    assert provider.last_response_id == "completion-123"

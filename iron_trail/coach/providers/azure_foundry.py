@@ -40,6 +40,8 @@ class AzureFoundryProvider:
         self._client = client or self._build_client()
         self._lock = threading.Lock()
         self.last_usage: TokenUsage | None = None
+        self.last_request_id: str | None = None
+        self.last_response_id: str | None = None
 
     def chat(self, messages: list[Message], *, timeout: float = 120.0) -> str:
         request_messages = [
@@ -47,11 +49,15 @@ class AzureFoundryProvider:
         ]
         with self._lock:
             self.last_usage = None
+            self.last_request_id = None
+            self.last_response_id = None
             response = self._client.with_options(timeout=timeout).chat.completions.create(
                 model=self.deployment,
                 messages=request_messages,
                 max_completion_tokens=self.max_output_tokens,
             )
+            self.last_request_id = _string_attribute(response, "_request_id")
+            self.last_response_id = _string_attribute(response, "id")
             if not response.choices or not response.choices[0].message.content:
                 raise RuntimeError("No assistant message returned from Microsoft Foundry.")
             usage = response.usage
@@ -76,3 +82,8 @@ class AzureFoundryProvider:
             azure_ad_token_provider=token_provider,
             max_retries=2,
         )
+
+
+def _string_attribute(value: Any, name: str) -> str | None:
+    attribute = getattr(value, name, None)
+    return str(attribute) if attribute else None
