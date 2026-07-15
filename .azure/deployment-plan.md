@@ -568,6 +568,10 @@ Cost ingestion can be delayed. After the calls:
 - Call 1 was accepted and returned Azure request/completion IDs, but no
   assistant text. The private ledger consumed the index as `uncertain` and
   stopped. Calls 2-10 were not sent and must not be replayed under this proof.
+- Azure Monitor independently confirmed exactly one HTTP 200 request at
+  04:51Z with 58 input tokens and 300 output tokens. The output ceiling was
+  fully consumed, explaining the empty assistant text. Meter-rate cost is
+  approximately EUR 0.00059321 before the 20% safety buffer.
 - The immediate authenticated Cost Management query returned no
   `rg-IronTrail` rows. Read-only checks continue only until
   `2026-07-16T04:50:50Z`; they cannot change this proof to success.
@@ -752,6 +756,7 @@ to `Validated`.
 | Foundry deployment | Exact create-only ARM payload and full readback | Succeeded | 2026-07-15 |
 | Foundry quota | `OpenAI.DataZoneStandard.gpt-5-mini` | 0 -> 10 of 300 | 2026-07-15 |
 | Synthetic proof | Private resumable ledger | Stopped on accepted empty completion at call 1; no replay | 2026-07-15 |
+| Azure Monitor call evidence | `AzureOpenAIRequests`, `InputTokens`, `OutputTokens` | HTTP 200; 1 request; 58 input; 300 output | 2026-07-15 |
 | Immediate cost check | Authenticated Cost Management query filtered to `rg-IronTrail` | No rows yet | 2026-07-15 |
 
 ---
