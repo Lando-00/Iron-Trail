@@ -1,9 +1,9 @@
 # IronTrail Azure Deployment Plan
 
-> **Status:** Stage B planned - awaiting execution approval
+> **Status:** Stage B deployment retained - proof stopped on call 1
 
 Generated: 2026-07-11  
-Last verified: 2026-07-13
+Last verified: 2026-07-15
 
 ---
 
@@ -35,10 +35,10 @@ domain in the first release.
 | Foundry account | `irontrail-resource`, AIServices S0, provisioning succeeded |
 | Foundry project | `irontrail` under `irontrail-resource` |
 | Foundry network | Keep public endpoint for beta; Entra/RBAC only, no committed API keys |
-| Model deployments | None |
+| Model deployments | `gpt-5-mini` DataZoneStandard at 10K TPM; retained idle |
 | Hosting branch | `feature/azure-hosting` |
 | Stage A implementation | Complete and locally validated |
-| Remote branch | Pushed at `e73766b` without merging |
+| Remote branch | Stage B code pushed through `aa25a44` without merging |
 
 The Samsung commit remains local until a later explicit push approval. The
 public repository must never contain a real Hevy, Samsung Health, Health
@@ -64,7 +64,7 @@ Implemented:
 
 Still deferred:
 
-- Any model deployment or paid Foundry inference.
+- Any further Foundry inference after the stopped Stage B proof.
 - Any website infrastructure deployment.
 - Google OAuth setup, live identity tests, and live two-user isolation tests.
 
@@ -377,22 +377,25 @@ Cost controls:
   production SLA. They are appropriate for this five-user private beta, not a
   later public production service.
 
-### Stage B verified baseline (2026-07-13)
+### Stage B verified baseline and result (2026-07-15)
 
 | Check | Current state |
 |---|---|
 | Subscription | Visual Studio Enterprise Subscription, enabled |
 | CLI spending-limit field | Not exposed (`null`); Azure billing portal check required |
 | Foundry account/project | `irontrail-resource` / `irontrail`, Sweden Central, succeeded |
-| Existing model deployments | None |
+| Existing model deployments | One: `gpt-5-mini`, exact approved configuration, provisioning succeeded |
 | Model | `gpt-5-mini`, version `2025-08-07`, OpenAI, Generally Available |
 | Supported SKU | `DataZoneStandard` confirmed live |
-| Subscription quota | 300K TPM allocated, 0 used |
+| Subscription quota | 300K TPM allocated, 10K used by the retained deployment |
 | Platform capacity | 300K TPM available in Sweden Central |
 | Proof allocation | 10K TPM, leaving 290K TPM unallocated |
 | RAI policy | `Microsoft.DefaultV2` exists |
 | Invoking identity | Inherited `Foundry User` plus subscription `Owner` |
-| `rg-IronTrail` month-to-date cost | No cost rows |
+| Portal credit evidence | EUR 129.75 remaining immediately before deployment |
+| Live token prices | EUR 0.2413/M input; EUR 1.9307/M output |
+| Buffered ten-call ceiling | EUR 0.01274172 |
+| `rg-IronTrail` month-to-date cost | Zero-row baseline; first post-call query also returned no rows |
 | Subscription month-to-date cost | About EUR 0.1027, entirely Cloud Shell Storage |
 
 ---
@@ -551,6 +554,29 @@ Cost ingestion can be delayed. After the calls:
 - Keep Stage C blocked.
 - Do not alter billing settings or proceed to website deployment.
 
+### Stage B execution result (2026-07-15)
+
+- Browser Companion showed EUR 129.75 remaining on the exact Visual Studio
+  Enterprise subscription immediately before deployment.
+- The runner fetched the exact Sweden Central EUR retail meters, authenticated
+  Cost Management zero-row baseline, exact identity, model, version, SKU,
+  capacity, RAI policy, empty deployment list, and 300K TPM capacity.
+- One create-only ARM `PUT` deployed `gpt-5-mini` `2025-08-07` as
+  DataZoneStandard capacity 10 with `Microsoft.DefaultV2` and
+  `OnceCurrentVersionExpired`. Full readback succeeded.
+- Quota converged from 0 to exactly 10 units before inference.
+- Call 1 was accepted and returned Azure request/completion IDs, but no
+  assistant text. The private ledger consumed the index as `uncertain` and
+  stopped. Calls 2-10 were not sent and must not be replayed under this proof.
+- The immediate authenticated Cost Management query returned no
+  `rg-IronTrail` rows. Read-only checks continue only until
+  `2026-07-16T04:50:50Z`; they cannot change this proof to success.
+- The deployment remains present but idle. No further inference is allowed,
+  and Stage C remains blocked.
+- The provider now requests minimal reasoning and classifies a future
+  accepted empty completion as terminal while preserving usage metadata.
+  Any rerun requires a new plan and explicit approval.
+
 ---
 
 ## 9. Health Integration Roadmap
@@ -674,16 +700,17 @@ Autopilot must stop before:
 
 ### Stage B: Foundry credit proof
 
-- [ ] Confirm spending limit and remaining Visual Studio benefit.
-- [ ] Capture authoritative live token prices and prove the ten-call worst case is <= EUR 0.05.
-- [ ] Revalidate model, DataZoneStandard quota/capacity, RAI policy, and target.
-- [ ] Add and test the synthetic credit-proof script.
-- [ ] Validate the exact one-resource deployment payload.
-- [ ] Deploy `gpt-5-mini` at 10K TPM and verify its full configuration.
-- [ ] Verify quota changed by exactly 10K TPM.
+- [x] Confirm remaining Visual Studio benefit.
+- [x] Capture authoritative live token prices and prove the ten-call worst case is <= EUR 0.05.
+- [x] Revalidate model, DataZoneStandard quota/capacity, RAI policy, and target.
+- [x] Add and test the synthetic credit-proof script.
+- [x] Validate the exact one-resource deployment payload.
+- [x] Deploy `gpt-5-mini` at 10K TPM and verify its full configuration.
+- [x] Verify quota changed by exactly 10K TPM.
 - [ ] Run ten bounded, resumable synthetic calls and record token usage.
+  Stopped after accepted call 1 returned no assistant text; calls 2-10 are prohibited.
 - [ ] Check Cost Management immediately and at bounded checkpoints up to 24h.
-- [ ] Record success or the no-further-calls failure state.
+- [x] Record the no-further-calls stopped state and keep Stage C blocked.
 
 ### Stage C: Full validation and website deployment - later explicit stage
 
@@ -721,6 +748,11 @@ to `Validated`.
 | AZD schema | `azd show --output json --no-prompt` | Pass | 2026-07-12 |
 | Independent code review | Two review passes over auth, storage, AI limits, HTML, telemetry, container, and IaC | All findings resolved | 2026-07-12 |
 | Privacy boundary | Raw data absent; Samsung code excluded; no introduced personal paths or credentials | Pass | 2026-07-12 |
+| Stage B proof runner | `ruff check .`; `python -m pytest -q` | 53 passed | 2026-07-15 |
+| Foundry deployment | Exact create-only ARM payload and full readback | Succeeded | 2026-07-15 |
+| Foundry quota | `OpenAI.DataZoneStandard.gpt-5-mini` | 0 -> 10 of 300 | 2026-07-15 |
+| Synthetic proof | Private resumable ledger | Stopped on accepted empty completion at call 1; no replay | 2026-07-15 |
+| Immediate cost check | Authenticated Cost Management query filtered to `rg-IronTrail` | No rows yet | 2026-07-15 |
 
 ---
 
@@ -735,6 +767,7 @@ to `Validated`.
 | `iron_trail/auth.py` | Easy Auth identity normalization and invite guard | Complete |
 | `iron_trail/cloud_storage.py` | User-partitioned Blob/Table persistence | Complete |
 | `iron_trail/coach/providers/azure_foundry.py` | Hosted AI provider | Complete |
+| `scripts/foundry_credit_proof.py` | Private-ledger Stage B deployment, call, quota, and cost proof runner | Complete |
 | `iron_trail/usage_limits.py` | Per-user/global AI reservation ledger | Complete |
 | Tests | Auth, isolation, retention, uploads, AI limits | Complete |
 
@@ -757,6 +790,7 @@ to `Validated`.
 
 ## 15. Next Step
 
-Execute the Stage B preflight. The first mutation is forbidden until the
-billing portal, target, model, SKU, quota, capacity, RAI policy, and empty
-deployment list all match this plan.
+Run read-only Cost Management checks until the Foundry row appears or
+`2026-07-16T04:50:50Z` passes. Do not send more inference, remove the retained
+deployment, or begin Stage C. A corrected proof rerun requires a new plan and
+explicit approval.
