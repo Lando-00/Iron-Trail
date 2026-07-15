@@ -25,7 +25,10 @@ from urllib import parse as url_parse
 from urllib import request as url_request
 
 from iron_trail.coach.providers import Message, TokenUsage
-from iron_trail.coach.providers.azure_foundry import AzureFoundryProvider
+from iron_trail.coach.providers.azure_foundry import (
+    AzureFoundryProvider,
+    EmptyAssistantResponseError,
+)
 
 PROOF_CALL_COUNT = 10
 MAX_INPUT_TOKENS = 2_000
@@ -561,17 +564,23 @@ def validate_ledger_structure(ledger: dict[str, Any]) -> None:
     cost_checks = ledger.get("cost_checks")
     if not isinstance(cost_checks, list):
         raise ProofError("Proof cost checks are invalid.")
+    outcome = ledger.get("outcome")
+    if outcome not in VALID_OUTCOMES:
+        raise ProofError("Proof outcome is invalid.")
     all_completed = all(call["state"] == "completed" for call in calls)
-    if cost_checks and not all_completed:
+    terminal_outcome = outcome in {
+        "stopped_uncertain",
+        "stopped_failure",
+        "stopped_cost_overrun",
+    }
+    if cost_checks and not all_completed and not terminal_outcome:
         raise ProofError("Proof cost checks require ten completed calls.")
-    latest_completion = (
-        max(
-            parse_timestamp(call["completed_at"], field="call.completed_at")
-            for call in calls
-        )
-        if all_completed
-        else None
-    )
+    completed_times = [
+        parse_timestamp(call["completed_at"], field="call.completed_at")
+        for call in calls
+        if call.get("completed_at")
+    ]
+    latest_completion = max(completed_times) if completed_times else None
     request_ids = {cost_baseline.get("request_id")}
     positive_cost_seen = False
     overrun_seen = False
@@ -612,16 +621,13 @@ def validate_ledger_structure(ledger: dict[str, Any]) -> None:
         positive_cost_seen = positive_cost_seen or foundry_cost > 0
         overrun_seen = overrun_seen or foundry_cost > HARD_BUDGET_EUR
 
-    outcome = ledger.get("outcome")
-    if outcome not in VALID_OUTCOMES:
-        raise ProofError("Proof outcome is invalid.")
     has_uncertain = any(call["state"] == "uncertain" for call in calls)
     has_failure = any(call["state"] == "failed_terminal" for call in calls)
     if outcome == "success" and not (
         all_completed and positive_cost_seen and not overrun_seen
     ):
         raise ProofError("Proof success lacks completed calls and valid cost evidence.")
-    if outcome == "stopped_cost_overrun" and not (all_completed and overrun_seen):
+    if outcome == "stopped_cost_overrun" and not overrun_seen:
         raise ProofError("Proof cost-overrun outcome lacks matching evidence.")
     if outcome == "awaiting_cost_confirmation" and not (
         all_completed and not positive_cost_seen and not overrun_seen
@@ -1117,9 +1123,19 @@ def check_live_cost(
     with exclusive_ledger_lock(ledger_path):
         ledger = load_ledger(ledger_path)
         validate_inference_ready(ledger)
-        if ledger["outcome"] != "awaiting_cost_confirmation":
-            raise ProofError("Cost checks are allowed only after all ten proof calls.")
-        if not all(call["state"] == "completed" for call in ledger["calls"]):
+        terminal_outcome = ledger["outcome"] in {
+            "stopped_uncertain",
+            "stopped_failure",
+        }
+        if ledger["outcome"] not in {
+            "awaiting_cost_confirmation",
+            "stopped_uncertain",
+            "stopped_failure",
+        }:
+            raise ProofError("Cost checks are not allowed in the current proof state.")
+        if not terminal_outcome and not all(
+            call["state"] == "completed" for call in ledger["calls"]
+        ):
             raise ProofError("Cost checks require ten valid completed call records.")
         cost_reader = cost_reader or read_live_cost
         evidence = cost_reader(ledger)
@@ -1130,10 +1146,14 @@ def check_live_cost(
             now=now_value,
             maximum_age_seconds=300,
         )
-        latest_call = max(
+        completed_calls = [
             parse_timestamp(call["completed_at"], field="call.completed_at")
             for call in ledger["calls"]
-        )
+            if call.get("completed_at")
+        ]
+        if not completed_calls:
+            raise ProofError("Cost evidence requires at least one submitted proof call.")
+        latest_call = max(completed_calls)
         observed_at = parse_timestamp(
             evidence["observed_at"],
             field="cost_check.observed_at",
@@ -1179,7 +1199,7 @@ def check_live_cost(
             ledger["outcome"] = "stopped_cost_overrun"
             save_ledger(ledger_path, ledger, clock=clock, lock_held=True)
             raise ProofError("Foundry cost evidence exceeds the EUR 0.05 proof ceiling.")
-        if foundry_cost > 0:
+        if foundry_cost > 0 and not terminal_outcome:
             ledger["outcome"] = "success"
         save_ledger(ledger_path, ledger, clock=clock, lock_held=True)
         return ledger
@@ -1399,6 +1419,7 @@ def build_live_provider(ledger: dict[str, Any]) -> AzureFoundryProvider:
         deployment=target["deployment_name"],
         api_version=API_VERSION,
         max_output_tokens=MAX_OUTPUT_TOKENS,
+        reasoning_effort="minimal",
         client=client,
     )
 
@@ -1916,7 +1937,10 @@ def execute_call(
                 save_ledger(ledger_path, ledger, clock=clock, lock_held=True)
                 sleep(retry_delay_seconds(exc))
                 continue
-            if kind in {"timeout", "connection"} or request_id or response_id:
+            if kind == "empty_response":
+                call["state"] = "failed_terminal"
+                ledger["outcome"] = "stopped_failure"
+            elif kind in {"timeout", "connection"} or request_id or response_id:
                 call["state"] = "uncertain"
                 ledger["outcome"] = "stopped_uncertain"
             else:
@@ -2002,6 +2026,8 @@ def used_budget(ledger: dict[str, Any]) -> Decimal:
 
 
 def exception_kind(exc: Exception) -> str:
+    if isinstance(exc, EmptyAssistantResponseError):
+        return "empty_response"
     try:
         from openai import APIConnectionError, APITimeoutError, RateLimitError
     except ImportError:

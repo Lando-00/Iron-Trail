@@ -454,7 +454,7 @@ def test_cost_check_is_blocked_before_proof_calls(tmp_path: Path) -> None:
     ledger_path = tmp_path / "proof.json"
     initialize_ready_ledger(ledger_path)
 
-    with pytest.raises(proof.ProofError, match="only after all ten"):
+    with pytest.raises(proof.ProofError, match="not allowed"):
         proof.check_live_cost(
             ledger_path,
             cost_reader=lambda _: cost_evidence(request_id="cost-request"),
@@ -509,3 +509,45 @@ def test_unexpected_target_service_cost_is_rejected(tmp_path: Path) -> None:
             cost_reader=lambda _: evidence,
             clock=fixed_clock,
         )
+
+
+def test_terminal_proof_can_record_cost_without_becoming_success(tmp_path: Path) -> None:
+    ledger_path = tmp_path / "proof.json"
+    ledger = initialize_ready_ledger(ledger_path)
+    ledger["calls"][0]["state"] = "inflight"
+    ledger["calls"][0]["attempts"] = 1
+    ledger["calls"][0]["submitted_at"] = fixed_clock().isoformat()
+    ledger["quota"]["call_checks"].append(
+        {"call_index": 1, "observation": quota_observation(10)}
+    )
+    proof.save_ledger(ledger_path, ledger, clock=fixed_clock)
+    with pytest.raises(proof.ProofError, match="marked uncertain"):
+        proof.run_proof(
+            ledger_path,
+            provider=FakeProvider(),
+            quota_reader=lambda _: quota_observation(10),
+            identity_checker=lambda _: None,
+            sleep=lambda _: None,
+            clock=fixed_clock,
+        )
+    stopped = proof.load_ledger(ledger_path)
+    evidence = cost_evidence(
+        request_id="terminal-cost-request",
+        rows=[
+            [
+                0.001,
+                "Foundry Models",
+                stopped["target"]["account_resource_id"],
+                "EUR",
+            ]
+        ],
+    )
+
+    checked = proof.check_live_cost(
+        ledger_path,
+        cost_reader=lambda _: evidence,
+        clock=fixed_clock,
+    )
+
+    assert checked["outcome"] == "stopped_uncertain"
+    assert checked["cost_checks"][-1]["foundry_charge_observed"] is True

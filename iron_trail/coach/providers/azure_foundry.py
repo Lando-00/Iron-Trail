@@ -10,6 +10,10 @@ from ...cloud_storage import azure_credential
 from . import Message, TokenUsage
 
 
+class EmptyAssistantResponseError(RuntimeError):
+    """Raised when Foundry completes a request without assistant text."""
+
+
 class AzureFoundryProvider:
     name = "azure-foundry"
 
@@ -20,6 +24,7 @@ class AzureFoundryProvider:
         deployment: str | None = None,
         api_version: str | None = None,
         max_output_tokens: int | None = None,
+        reasoning_effort: str | None = None,
         client: Any | None = None,
     ) -> None:
         self.endpoint = endpoint or os.environ.get("IRONTRAIL_AZURE_OPENAI_ENDPOINT", "")
@@ -32,6 +37,7 @@ class AzureFoundryProvider:
         self.max_output_tokens = max_output_tokens or runtime.env_int(
             "IRONTRAIL_AI_MAX_OUTPUT_TOKENS", 1200, minimum=1
         )
+        self.reasoning_effort = reasoning_effort
         if not self.endpoint:
             raise runtime.ConfigurationError("IRONTRAIL_AZURE_OPENAI_ENDPOINT is required")
         if not self.deployment:
@@ -51,20 +57,27 @@ class AzureFoundryProvider:
             self.last_usage = None
             self.last_request_id = None
             self.last_response_id = None
+            request: dict[str, Any] = {
+                "model": self.deployment,
+                "messages": request_messages,
+                "max_completion_tokens": self.max_output_tokens,
+            }
+            if self.reasoning_effort:
+                request["reasoning_effort"] = self.reasoning_effort
             response = self._client.with_options(timeout=timeout).chat.completions.create(
-                model=self.deployment,
-                messages=request_messages,
-                max_completion_tokens=self.max_output_tokens,
+                **request
             )
             self.last_request_id = _string_attribute(response, "_request_id")
             self.last_response_id = _string_attribute(response, "id")
-            if not response.choices or not response.choices[0].message.content:
-                raise RuntimeError("No assistant message returned from Microsoft Foundry.")
             usage = response.usage
             if usage is not None:
                 self.last_usage = TokenUsage(
                     input_tokens=int(usage.prompt_tokens or 0),
                     output_tokens=int(usage.completion_tokens or 0),
+                )
+            if not response.choices or not response.choices[0].message.content:
+                raise EmptyAssistantResponseError(
+                    "No assistant message returned from Microsoft Foundry."
                 )
             return response.choices[0].message.content
 
