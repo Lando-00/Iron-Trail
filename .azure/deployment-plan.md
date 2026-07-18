@@ -1,6 +1,6 @@
 # IronTrail Azure Deployment Plan
 
-> **Status:** Stage B deployment retained - proof stopped on call 1
+> **Status:** Stage B billing confirmed - synthetic proof incomplete
 
 Generated: 2026-07-11  
 Last verified: 2026-07-15
@@ -395,7 +395,7 @@ Cost controls:
 | Portal credit evidence | EUR 129.75 remaining immediately before deployment |
 | Live token prices | EUR 0.2413/M input; EUR 1.9307/M output |
 | Buffered ten-call ceiling | EUR 0.01274172 |
-| `rg-IronTrail` month-to-date cost | Zero-row baseline; first post-call query also returned no rows |
+| `rg-IronTrail` month-to-date cost | EUR 0.000585690382 attributed to the exact Foundry account |
 | Subscription month-to-date cost | About EUR 0.1027, entirely Cloud Shell Storage |
 
 ---
@@ -572,9 +572,12 @@ Cost ingestion can be delayed. After the calls:
   04:51Z with 58 input tokens and 300 output tokens. The output ceiling was
   fully consumed, explaining the empty assistant text. Meter-rate cost is
   approximately EUR 0.00059321 before the 20% safety buffer.
-- The immediate authenticated Cost Management query returned no
-  `rg-IronTrail` rows. Read-only checks continue only until
-  `2026-07-16T04:50:50Z`; they cannot change this proof to success.
+- Cost Management later attributed EUR 0.000585690382 to the exact
+  `irontrail-resource` account. Usage Details independently reported 0.000058M
+  input tokens and 0.0003M output tokens, matching Azure Monitor's 58/300
+  evidence and the live EUR meter calculation.
+- The Visual Studio credit billing path is therefore confirmed, but this
+  cannot change the proof to success because only call 1 of 10 was attempted.
 - The deployment remains present but idle. No further inference is allowed,
   and Stage C remains blocked.
 - The provider now requests minimal reasoning and classifies a future
@@ -713,7 +716,7 @@ Autopilot must stop before:
 - [x] Verify quota changed by exactly 10K TPM.
 - [ ] Run ten bounded, resumable synthetic calls and record token usage.
   Stopped after accepted call 1 returned no assistant text; calls 2-10 are prohibited.
-- [ ] Check Cost Management immediately and at bounded checkpoints up to 24h.
+- [x] Check Cost Management and confirm the exact-account Foundry charge.
 - [x] Record the no-further-calls stopped state and keep Stage C blocked.
 
 ### Stage C: Full validation and website deployment - later explicit stage
@@ -757,7 +760,7 @@ to `Validated`.
 | Foundry quota | `OpenAI.DataZoneStandard.gpt-5-mini` | 0 -> 10 of 300 | 2026-07-15 |
 | Synthetic proof | Private resumable ledger | Stopped on accepted empty completion at call 1; no replay | 2026-07-15 |
 | Azure Monitor call evidence | `AzureOpenAIRequests`, `InputTokens`, `OutputTokens` | HTTP 200; 1 request; 58 input; 300 output | 2026-07-15 |
-| Immediate cost check | Authenticated Cost Management query filtered to `rg-IronTrail` | No rows yet | 2026-07-15 |
+| Foundry billing attribution | Authenticated Cost Management query filtered to `rg-IronTrail` | EUR 0.000585690382 on `irontrail-resource` | 2026-07-18 |
 
 ---
 
@@ -795,7 +798,8 @@ to `Validated`.
 
 ## 15. Next Step
 
-Run read-only Cost Management checks until the Foundry row appears or
-`2026-07-16T04:50:50Z` passes. Do not send more inference, remove the retained
-deployment, or begin Stage C. A corrected proof rerun requires a new plan and
-explicit approval.
+Stage B has confirmed the Visual Studio credit billing path but did not
+complete the approved ten-call protocol. Keep the retained deployment idle and
+Stage C blocked. The next action is a new, explicitly approved proof plan that
+uses the corrected minimal-reasoning request settings; do not replay call 1 or
+send further inference under this proof.
