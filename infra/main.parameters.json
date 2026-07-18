@@ -26,9 +26,14 @@
     "bootstrapInviteHash": {
       "value": "${IRONTRAIL_BOOTSTRAP_INVITE_HASH}"
     },
+    "ownerObjectId": {
+      "value": "${IRONTRAIL_OWNER_OBJECT_ID}"
+    },
+    "authReady": {
+      "value": "${IRONTRAIL_AUTH_READY}"
+    },
     "monthlyBudgetEur": {
       "value": 25
     }
   }
 }
-

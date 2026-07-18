@@ -75,6 +75,27 @@ def test_foundry_provider_passes_reasoning_effort() -> None:
     assert client.completions.kwargs["reasoning_effort"] == "minimal"
 
 
+def test_foundry_provider_reads_cloud_controls_from_environment(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("IRONTRAIL_AI_REASONING_EFFORT", "minimal")
+    monkeypatch.setenv("IRONTRAIL_AI_MAX_RETRIES", "0")
+    monkeypatch.setenv("IRONTRAIL_AI_MAX_OUTPUT_TOKENS", "1200")
+    client = FakeClient()
+
+    provider = AzureFoundryProvider(
+        endpoint="https://example.openai.azure.com",
+        deployment="gpt-5-mini",
+        client=client,
+    )
+    provider.chat([Message("user", "Format this synthetic object.")])
+
+    assert provider.reasoning_effort == "minimal"
+    assert provider.max_retries == 0
+    assert provider.max_output_tokens == 1200
+    assert client.completions.kwargs["reasoning_effort"] == "minimal"
+
+
 def test_foundry_provider_tracks_usage_before_empty_response_error() -> None:
     client = FakeClient()
     client.completions.create = lambda **_kwargs: SimpleNamespace(

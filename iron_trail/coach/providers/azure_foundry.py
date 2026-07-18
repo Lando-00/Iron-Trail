@@ -25,6 +25,7 @@ class AzureFoundryProvider:
         api_version: str | None = None,
         max_output_tokens: int | None = None,
         reasoning_effort: str | None = None,
+        max_retries: int | None = None,
         client: Any | None = None,
     ) -> None:
         self.endpoint = endpoint or os.environ.get("IRONTRAIL_AZURE_OPENAI_ENDPOINT", "")
@@ -37,7 +38,17 @@ class AzureFoundryProvider:
         self.max_output_tokens = max_output_tokens or runtime.env_int(
             "IRONTRAIL_AI_MAX_OUTPUT_TOKENS", 1200, minimum=1
         )
-        self.reasoning_effort = reasoning_effort
+        configured_reasoning = (
+            reasoning_effort
+            if reasoning_effort is not None
+            else os.environ.get("IRONTRAIL_AI_REASONING_EFFORT", "")
+        )
+        self.reasoning_effort = configured_reasoning.strip() or None
+        self.max_retries = (
+            max_retries
+            if max_retries is not None
+            else runtime.env_int("IRONTRAIL_AI_MAX_RETRIES", 2, minimum=0)
+        )
         if not self.endpoint:
             raise runtime.ConfigurationError("IRONTRAIL_AZURE_OPENAI_ENDPOINT is required")
         if not self.deployment:
@@ -93,7 +104,7 @@ class AzureFoundryProvider:
             azure_endpoint=self.endpoint,
             api_version=self.api_version,
             azure_ad_token_provider=token_provider,
-            max_retries=2,
+            max_retries=self.max_retries,
         )
 
 

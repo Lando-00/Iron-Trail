@@ -97,9 +97,11 @@ Triggered when CSV re-export becomes the actual blocker.
 
 The hosted path keeps the local app intact and adds a separate cloud mode:
 
-- Invite-only access for five testers using Easy Auth and single-use codes.
+- Stage C owner-only access through Microsoft Easy Auth and an owner-bound
+  single-use bootstrap code. Google plus tester invitations are a later gate.
 - Session-only uploads by default; explicit opt-in Blob/Table persistence.
-- 30-day raw and 60-day normalized retention, plus export/delete controls.
+- 30-day raw and 60-day normalized active retention, plus export/delete
+  controls and seven-day privileged Blob recovery.
 - A managed-identity Microsoft Foundry provider with per-user allowances and
   a global monthly hard cap. Local mode continues using Copilot.
 - Container Apps Consumption with scale-to-zero and one maximum replica while

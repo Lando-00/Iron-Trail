@@ -91,6 +91,7 @@ class AzureAuthRepository(AuthRepository):
         code: str,
         *,
         bootstrap_hash: str,
+        bootstrap_owner_id: str,
         max_users: int,
     ) -> User:
         from azure.core import MatchConditions
@@ -111,12 +112,18 @@ class AzureAuthRepository(AuthRepository):
                 code_hash = hash_invite_code(code)
                 role = "member"
                 invite_entity: Any | None = None
-                bootstrap = (
+                bootstrap_matches = (
                     not bool(state.get("bootstrapClaimed"))
                     and bootstrap_hash
                     and secrets.compare_digest(code_hash, bootstrap_hash)
                 )
-                if bootstrap:
+                if bootstrap_matches and not (
+                    identity.provider == "aad"
+                    and bootstrap_owner_id
+                    and secrets.compare_digest(identity.principal_id, bootstrap_owner_id)
+                ):
+                    raise InvitationError("That invite code is invalid or expired.")
+                if bootstrap_matches:
                     role = "admin"
                 else:
                     try:
@@ -132,7 +139,7 @@ class AzureAuthRepository(AuthRepository):
                 user = _new_user(identity, role)
                 state_update = dict(state)
                 state_update["userCount"] = int(state.get("userCount", 0)) + 1
-                if bootstrap:
+                if bootstrap_matches:
                     state_update["bootstrapClaimed"] = True
                 else:
                     state_update["activeInviteCount"] = max(

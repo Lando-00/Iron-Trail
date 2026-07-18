@@ -19,6 +19,18 @@ from . import runtime
 
 _USER_NAMESPACE = uuid.UUID("25b64e27-4acd-4e23-8b94-2a0657200fb4")
 _AUTH_PARTITION = "auth"
+_SENSITIVE_SESSION_KEYS = {
+    "csv_upload_widget",
+    "it_current_user",
+    "it_current_user_checked_at",
+    "it_data_export_bytes",
+    "it_new_invite_code",
+    "it_saved_upload_id",
+    "it_upload_bytes",
+    "it_upload_name",
+    "manage_cloud_dataset",
+}
+_SENSITIVE_SESSION_PREFIXES = ("coach_",)
 
 
 class AuthenticationError(RuntimeError):
@@ -80,6 +92,7 @@ class AuthRepository(Protocol):
         code: str,
         *,
         bootstrap_hash: str,
+        bootstrap_owner_id: str,
         max_users: int,
     ) -> User: ...
 
@@ -160,6 +173,13 @@ def current_user() -> User:
     return require_invited_user()
 
 
+def clear_sensitive_session_state() -> None:
+    """Remove all per-session values when the authenticated identity changes."""
+    for key in list(st.session_state):
+        if key in _SENSITIVE_SESSION_KEYS or key.startswith(_SENSITIVE_SESSION_PREFIXES):
+            st.session_state.pop(key, None)
+
+
 def require_invited_user(repository: AuthRepository | None = None) -> User:
     if not runtime.is_cloud():
         return local_user()
@@ -171,6 +191,7 @@ def require_invited_user(repository: AuthRepository | None = None) -> User:
         st.stop()
 
     if identity is None:
+        clear_sensitive_session_state()
         _render_login()
         st.stop()
 
@@ -180,6 +201,9 @@ def require_invited_user(repository: AuthRepository | None = None) -> User:
         st.error("IronTrail cloud authentication is not configured.")
         st.stop()
     cached = st.session_state.get("it_current_user")
+    if isinstance(cached, User) and cached.user_id != identity.user_id:
+        clear_sensitive_session_state()
+        cached = None
     checked_at = st.session_state.get("it_current_user_checked_at")
     revalidate_after = timedelta(
         seconds=runtime.env_int("IRONTRAIL_AUTH_REVALIDATE_SECONDS", 30, minimum=0)
@@ -203,8 +227,7 @@ def require_invited_user(repository: AuthRepository | None = None) -> User:
         st.session_state["it_current_user_checked_at"] = now
         return user
 
-    st.session_state.pop("it_current_user", None)
-    st.session_state.pop("it_current_user_checked_at", None)
+    clear_sensitive_session_state()
     _render_invite_gate(identity, repo)
     st.stop()
 
@@ -219,6 +242,11 @@ def render_account_controls(user: User, repository: AuthRepository | None = None
     if not user.is_admin:
         return
 
+    max_users = runtime.env_int("IRONTRAIL_MAX_USERS", 5, minimum=1)
+    if max_users == 1:
+        st.caption("Owner-only beta; tester invitations are disabled.")
+        return
+
     with st.expander("Invite a tester"):
         st.caption("Codes are single-use, expire automatically, and are shown only once.")
         if st.button("Generate invite code", key="generate_invite_code", use_container_width=True):
@@ -229,7 +257,7 @@ def render_account_controls(user: User, repository: AuthRepository | None = None
                     ttl=timedelta(
                         hours=runtime.env_int("IRONTRAIL_INVITE_TTL_HOURS", 72, minimum=1)
                     ),
-                    max_users=runtime.env_int("IRONTRAIL_MAX_USERS", 5, minimum=1),
+                    max_users=max_users,
                 )
             except (InvitationError, AuthRepositoryError) as exc:
                 st.error(str(exc))
@@ -266,6 +294,7 @@ class InMemoryAuthRepository:
         code: str,
         *,
         bootstrap_hash: str,
+        bootstrap_owner_id: str,
         max_users: int,
     ) -> User:
         with self._lock:
@@ -278,9 +307,14 @@ class InMemoryAuthRepository:
             code_hash = hash_invite_code(code)
             role = "member"
             invite = self.invites.get(code_hash)
-            if not self.users and bootstrap_hash and secrets.compare_digest(
-                code_hash, bootstrap_hash
-            ):
+            bootstrap_matches = (
+                not self.users
+                and bootstrap_hash
+                and secrets.compare_digest(code_hash, bootstrap_hash)
+            )
+            if bootstrap_matches and not _is_bootstrap_owner(identity, bootstrap_owner_id):
+                raise InvitationError("That invite code is invalid or expired.")
+            if bootstrap_matches:
                 role = "admin"
             elif invite is None or not invite.is_active:
                 raise InvitationError("That invite code is invalid or expired.")
@@ -307,6 +341,14 @@ class InMemoryAuthRepository:
             return code
 
 
+def _is_bootstrap_owner(identity: Identity, bootstrap_owner_id: str) -> bool:
+    return (
+        identity.provider == "aad"
+        and bool(bootstrap_owner_id)
+        and secrets.compare_digest(identity.principal_id, bootstrap_owner_id)
+    )
+
+
 def _render_login() -> None:
     st.title("IronTrail private beta")
     st.write("Sign in with an approved identity, then redeem your one-time invite code.")
@@ -327,6 +369,7 @@ def _render_invite_gate(identity: Identity, repository: AuthRepository) -> None:
                 identity,
                 code,
                 bootstrap_hash=os.environ.get("IRONTRAIL_BOOTSTRAP_INVITE_HASH", ""),
+                bootstrap_owner_id=os.environ.get("IRONTRAIL_OWNER_OBJECT_ID", ""),
                 max_users=runtime.env_int("IRONTRAIL_MAX_USERS", 5, minimum=1),
             )
         except (InvitationError, AuthRepositoryError) as exc:

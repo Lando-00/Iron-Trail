@@ -105,6 +105,7 @@ def test_bootstrap_invite_creates_the_only_initial_admin() -> None:
         Identity("aad", "owner", "Owner"),
         bootstrap_code,
         bootstrap_hash=hash_invite_code(bootstrap_code),
+        bootstrap_owner_id="owner",
         max_users=5,
     )
 
@@ -114,6 +115,7 @@ def test_bootstrap_invite_creates_the_only_initial_admin() -> None:
             Identity("aad", "second-owner", "Second"),
             bootstrap_code,
             bootstrap_hash=hash_invite_code(bootstrap_code),
+            bootstrap_owner_id="owner",
             max_users=5,
         )
 
@@ -125,6 +127,7 @@ def test_admin_issues_single_use_invite() -> None:
         Identity("aad", "owner", "Owner"),
         bootstrap_code,
         bootstrap_hash=hash_invite_code(bootstrap_code),
+        bootstrap_owner_id="owner",
         max_users=2,
     )
     code = repo.issue_invite(owner, ttl=timedelta(hours=1), max_users=2)
@@ -133,6 +136,7 @@ def test_admin_issues_single_use_invite() -> None:
         Identity("google", "member", "Member"),
         code,
         bootstrap_hash="",
+        bootstrap_owner_id="owner",
         max_users=2,
     )
 
@@ -142,6 +146,7 @@ def test_admin_issues_single_use_invite() -> None:
             Identity("google", "other", "Other"),
             code,
             bootstrap_hash="",
+            bootstrap_owner_id="owner",
             max_users=3,
         )
 
@@ -154,6 +159,7 @@ def test_azure_repository_uses_conditional_transactions() -> None:
         Identity("aad", "owner", "Owner"),
         bootstrap_code,
         bootstrap_hash=hash_invite_code(bootstrap_code),
+        bootstrap_owner_id="owner",
         max_users=2,
     )
     code = repo.issue_invite(owner, ttl=timedelta(hours=1), max_users=2)
@@ -161,6 +167,7 @@ def test_azure_repository_uses_conditional_transactions() -> None:
         Identity("google", "member", "Member"),
         code,
         bootstrap_hash="",
+        bootstrap_owner_id="owner",
         max_users=2,
     )
 
@@ -173,3 +180,59 @@ def test_azure_repository_uses_conditional_transactions() -> None:
     assert update_kwargs
     assert all(kwargs.get("etag") for kwargs in update_kwargs)
     assert all(kwargs.get("match_condition") is not None for kwargs in update_kwargs)
+
+
+@pytest.mark.parametrize(
+    "identity",
+    [
+        Identity("aad", "wrong-owner", "Wrong owner"),
+        Identity("google", "owner", "Wrong provider"),
+    ],
+)
+def test_bootstrap_invite_is_bound_to_expected_aad_owner(identity: Identity) -> None:
+    repo = InMemoryAuthRepository()
+    bootstrap_code = "owner-bootstrap-code"
+
+    with pytest.raises(InvitationError, match="invalid or expired"):
+        repo.redeem(
+            identity,
+            bootstrap_code,
+            bootstrap_hash=hash_invite_code(bootstrap_code),
+            bootstrap_owner_id="owner",
+            max_users=1,
+        )
+
+    assert repo.users == {}
+
+
+def test_azure_bootstrap_is_bound_to_expected_aad_owner() -> None:
+    table = _FakeTable()
+    repo = AzureAuthRepository(table)
+    bootstrap_code = "owner-bootstrap-code"
+
+    with pytest.raises(InvitationError, match="invalid or expired"):
+        repo.redeem(
+            Identity("aad", "wrong-owner", "Wrong owner"),
+            bootstrap_code,
+            bootstrap_hash=hash_invite_code(bootstrap_code),
+            bootstrap_owner_id="owner",
+            max_users=1,
+        )
+
+    assert not any(row.startswith("user:") for _, row in table.entities)
+
+
+def test_sensitive_session_state_is_cleared(monkeypatch) -> None:
+    from iron_trail import auth
+
+    state = {
+        "it_upload_bytes": b"private",
+        "it_data_export_bytes": b"archive",
+        "coach_chat_history": [("user", "private")],
+        "invite_widget_state": "preserve",
+    }
+    monkeypatch.setattr(auth.st, "session_state", state)
+
+    auth.clear_sensitive_session_state()
+
+    assert state == {"invite_widget_state": "preserve"}

@@ -26,6 +26,16 @@ param aadClientSecret string
 @description('SHA-256 hash of the first administrator invite code.')
 param bootstrapInviteHash string
 
+@description('Immutable Entra object ID allowed to redeem the bootstrap administrator invite.')
+param ownerObjectId string
+
+@allowed([
+  'false'
+  'true'
+])
+@description('Whether the verified login landing page may accept anonymous requests.')
+param authReady string = 'false'
+
 @description('Monthly Azure budget in EUR for this resource group.')
 param monthlyBudgetEur int = 25
 
@@ -39,11 +49,13 @@ module application './modules/application.bicep' = {
   params: {
     aadClientId: aadClientId
     aadClientSecret: aadClientSecret
+    authReady: authReady
     bootstrapInviteHash: bootstrapInviteHash
     environmentName: environmentName
     foundryAccountName: foundryAccountName
     location: location
     modelDeploymentName: modelDeploymentName
+    ownerObjectId: ownerObjectId
   }
 }
 

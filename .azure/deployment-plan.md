@@ -1,9 +1,9 @@
 # IronTrail Azure Deployment Plan
 
-> **Status:** Stage B complete - ready for Stage C validation planning
+> **Status:** Stage C approved - preparation in progress
 
 Generated: 2026-07-11  
-Last verified: 2026-07-15
+Last verified: 2026-07-18
 
 ---
 
@@ -191,9 +191,9 @@ Private per-user raw and normalized datasets
   provider and principal ID, never a filename or display name.
 - Unknown or uninvited identities can authenticate but cannot enter the
   dashboard or access data.
-- The first deployment enables Microsoft login. Google support is implemented
-  in code but its external OAuth configuration is added before any testers are
-  invited.
+- Stage C enables Microsoft login for the owner only. Google OAuth and live
+  cross-user testing are deferred to a later gate; no testers are invited in
+  Stage C.
 
 ### User-data model
 
@@ -210,8 +210,10 @@ Table AiUsage: per-user daily/monthly counters and actual token usage
   explicitly selects cloud persistence.
 - Saved files remain private and are accessed only by the app's managed
   identity.
-- Blob lifecycle rules enforce 30/60-day deletion. Expired table metadata is
-  removed opportunistically and during administrative cleanup.
+- Blob lifecycle rules remove active raw/normalized data after 30/60 days.
+  Seven-day blob/container soft delete remains enabled for privileged recovery,
+  so the effective maximum recoverable periods are 37/67 days. Expired table
+  metadata is removed opportunistically and during administrative cleanup.
 - Users receive explicit Download and Delete All Data controls.
 - Hosted mode disables arbitrary server filesystem/Vault paths. Markdown and
   PDF remain browser downloads. Local mode keeps Obsidian writeback.
@@ -589,7 +591,110 @@ Cost ingestion can be delayed. After the calls:
 
 ---
 
-## 9. Health Integration Roadmap
+## 9. Stage C Owner-Only Website Plan
+
+### Approved decisions
+
+| Area | Stage C decision |
+|---|---|
+| Scope | Validate, deploy, and test |
+| AZD environment | `beta` |
+| Azure target | Visual Studio Enterprise Subscription; existing `rg-IronTrail` |
+| Regions | North Europe app/data; existing Sweden Central Foundry |
+| Authentication | Dedicated single-tenant Entra web app; Microsoft owner only |
+| Owner identity | One explicitly configured Entra object ID (kept outside Git) |
+| Google | Deferred beyond Stage C; no tester invitations |
+| User ceiling | `IRONTRAIL_MAX_USERS=1` |
+| Foundry smoke | One synthetic logical call, exactly one HTTP attempt |
+| Failure policy | Retain resources, disable public ingress, invite nobody |
+| Deletion policy | Seven-day privileged Blob recovery; 37/67-day maximum |
+| Entra secret | 90-day lifetime with rotation record |
+| Budget | EUR 25 alert threshold; not a hard spending stop |
+
+No custom domain, private networking, zone redundancy, Google OAuth, Samsung
+Health, Health Connect, Analytics Lab, merge to `main`, or real
+workout/health data is in Stage C.
+
+### Preparation fixes
+
+1. Verify account-relative Blob lifecycle prefixes remain
+   `datasets/raw/` and `datasets/normalized/`, matching the `datasets`
+   container plus application blob names.
+2. Point Container Apps probes to `/_stcore/health`.
+3. Configure hosted Foundry with environment-backed minimal reasoning, an
+   explicit 1,200-token output ceiling, and zero SDK retries.
+4. Bind first-admin bootstrap to provider `aad` and the approved owner object
+   ID.
+5. Set max users to one and retain AAD-only login.
+6. Purge sensitive Streamlit state when authentication disappears or identity
+   changes.
+7. Document seven-day privileged Blob recovery and effective 37/67-day
+   maximum retention.
+8. Add static/runtime tests plus a machine-readable deployment what-if
+   allowlist.
+
+### Fail-closed identity rollout
+
+1. Create or verify a dedicated `IronTrail Beta` single-tenant Entra web app
+   by stable ID, with no Graph permissions, owner assignment, assignment
+   required, and a 90-day secret captured without stdout.
+2. Generate a private bootstrap code; store only its hash in AZD/Key Vault.
+3. Create/select AZD `beta` with confirmed Azure/Foundry values and
+   `authReady=false`.
+4. Initial provisioning uses `Return401`, preventing access to the placeholder
+   and real image before callback registration.
+5. After `WEB_URL` exists, register
+   `${WEB_URL}/.auth/login/aad/callback`, enable ID-token issuance, verify exact
+   app/service-principal IDs, and then apply `authReady=true`.
+6. `AllowAnonymous` exposes only the application login landing page;
+   `require_invited_user()` remains the data boundary.
+
+### Validation and deployment
+
+1. Complete preparation fixes and set this plan to `Ready for Validation`.
+2. Invoke `azure-validate`: full Ruff/pytest, production image/health/isolation,
+   AZD schema/package/preview, Bicep, policy/quota, static RBAC, leak scan,
+   baseline capture, and machine-enforced what-if.
+3. Reject Delete, Replace, unexpected existing-resource modification,
+   unapproved role assignments, extra resource types, or any Foundry
+   account/project mutation.
+4. Set `Validated` only when every proof row passes.
+5. Invoke `azure-deploy`; never run deployment commands outside that skill.
+6. Record resources, image digest, revision, URL, RBAC, probes, budget, quota,
+   and cost baseline.
+
+### Owner checkpoint and acceptance
+
+Execution pauses at `WAITING_FOR_OWNER_BOOTSTRAP`. Resume only after the user
+signs in and a UAMI-backed read proves one AAD admin with the approved principal
+ID, `bootstrapClaimed=true`, and zero invitations.
+
+Use only bundled/synthetic data to verify:
+
+- anonymous/login/logout/relogin, all pages, downloads, websockets, probes, and
+  sensitive session-state clearing;
+- session-only uploads leave no durable records;
+- opt-in Blob/Table partitioning, export, delete-selected, Delete All, and the
+  seven-day recovery wording;
+- one synthetic Coach call returns text with one HTTP request, atomic usage
+  completion, no raw prompt/log data, and healthy cost caps;
+- min 0/max 1, single revision, UAMI/RBAC, expected inventory, 0.25-GB/day log
+  cap, 30-day logs, and EUR 10/20/25 alerts.
+
+### Failure and completion
+
+- Auth/privacy/isolation/cost/unexpected-resource failure disables external
+  ingress; scale-to-zero alone is not containment.
+- Remove the Entra redirect if authentication/privacy is unsafe.
+- Retain resources for repair; never delete automatically.
+- Keep max users one and invite nobody.
+- Success is owner-only. Google plus live two-user isolation is Stage C2.
+- Update plans, public-safe docs, Vault, SQL, and outputs; commit/push
+  `feature/azure-hosting` without merging.
+
+---
+
+## 10. Health Integration Roadmap
 
 ### Samsung Health
 
@@ -628,7 +733,7 @@ Planned heart-rate surfaces:
 
 ---
 
-## 10. Autopilot Execution Contract
+## 11. Autopilot Execution Contract
 
 ### Approved now: Stage A, code-first
 
@@ -683,7 +788,7 @@ Autopilot must stop before:
 
 ---
 
-## 11. Execution Checklist
+## 12. Execution Checklist
 
 ### Phase 1: Planning
 
@@ -724,11 +829,17 @@ Autopilot must stop before:
 
 ### Stage C: Full validation and website deployment - later explicit stage
 
+- [ ] Verify lifecycle prefixes; fix health probes, owner binding, session cleanup,
+  Foundry minimal reasoning/zero retries, and owner-only settings.
+- [ ] Create the dedicated assigned Entra app and private bootstrap material.
+- [ ] Configure AZD `beta` and enforce the deployment preview allowlist.
 - [ ] Update this status to `Ready for Validation`.
 - [ ] Invoke `azure-validate` for the complete architecture.
 - [ ] Verify local and containerized application behavior.
-- [ ] Test Microsoft and Google login.
-- [ ] Test two simultaneous users and prove negative cross-user access.
+- [ ] Deploy fail-closed with Microsoft owner login; Google remains deferred.
+- [ ] Complete and verify the owner bootstrap checkpoint.
+- [ ] Keep automated two-identity isolation tests; defer live cross-user testing
+  to Stage C2 before testers.
 - [ ] Verify opt-in persistence and 30/60-day expiry configuration.
 - [ ] Verify AI quotas, global disable behavior, and no Copilot credentials.
 - [ ] Record validation proof and set status to `Validated`.
@@ -740,7 +851,7 @@ Autopilot must stop before:
 
 ---
 
-## 12. Validation Proof
+## 13. Validation Proof
 
 The `azure-validate` skill must populate this section before the plan can move
 to `Validated`.
@@ -767,7 +878,7 @@ to `Validated`.
 
 ---
 
-## 13. Files to Generate
+## 14. Files to Generate
 
 | File/component | Purpose | Status |
 |---|---|---|
@@ -784,7 +895,7 @@ to `Validated`.
 
 ---
 
-## 14. Git and Release Boundary
+## 15. Git and Release Boundary
 
 - Do not push the Samsung commit yet.
 - Do not amend or squash the existing Samsung commit.
@@ -799,10 +910,9 @@ to `Validated`.
 
 ---
 
-## 15. Next Step
+## 16. Next Step
 
-Stage B is complete: deployment, quota, request metering, token usage, portal
-credit, and exact-account Cost Management attribution are all proven. The
-ten-call protocol is retired as unnecessary. Next, refresh Stage C validation
-against the current branch and live subscription. Do not provision the website
-until the user separately approves `azure-deploy`.
+Implement the approved preparation fixes, create the owner-assigned Entra
+registration and private AZD `beta` environment, then hand off through
+`azure-validate`. Only validated artifacts may proceed through `azure-deploy`.
+Google and testers remain deferred.

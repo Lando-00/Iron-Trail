@@ -165,8 +165,9 @@ def _render_cloud_data_source() -> tuple[pd.DataFrame, str, float]:
             "Save privately",
             value=False,
             help=(
-                "Raw upload expires after 30 days. Normalized workout data expires "
-                "after 60 days."
+                "Active raw data expires after 30 days and active normalized data after "
+                "60 days. Deleted blobs may remain recoverable by privileged Azure "
+                "operators for up to 7 additional days."
             ),
         )
         if persist and st.button("Save this dataset", type="primary", use_container_width=True):
@@ -220,8 +221,10 @@ def _render_cloud_data_controls(user_id: str, repository) -> None:
             key="manage_cloud_dataset",
         )
         st.caption(
-            f"Raw expires {selected.raw_expires_at:%Y-%m-%d}; "
-            f"normalized data expires {selected.normalized_expires_at:%Y-%m-%d}."
+            f"Active raw data expires {selected.raw_expires_at:%Y-%m-%d}; "
+            f"active normalized data expires {selected.normalized_expires_at:%Y-%m-%d}. "
+            "Deleted blobs may remain recoverable by privileged Azure operators for "
+            "up to 7 days."
         )
         if st.button("Delete selected dataset", key="delete_cloud_dataset"):
             repository.delete_dataset(user_id, selected.dataset_id)
@@ -242,9 +245,13 @@ def _render_cloud_data_controls(user_id: str, repository) -> None:
                 use_container_width=True,
             )
 
-        confirm = st.checkbox("I understand this deletes all saved datasets.")
+        confirm = st.checkbox(
+            "I understand this removes all datasets from active IronTrail access; "
+            "deleted blobs may remain recoverable by privileged Azure operators for "
+            "up to 7 days."
+        )
         if st.button(
-            "Delete all saved data",
+            "Delete all active saved data",
             disabled=not confirm,
             key="delete_all_cloud_data",
             use_container_width=True,

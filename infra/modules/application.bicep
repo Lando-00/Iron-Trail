@@ -23,6 +23,16 @@ param aadClientSecret string
 @description('SHA-256 hash of the bootstrap administrator invite.')
 param bootstrapInviteHash string
 
+@description('Immutable Entra object ID allowed to redeem the bootstrap administrator invite.')
+param ownerObjectId string
+
+@allowed([
+  'false'
+  'true'
+])
+@description('Whether the verified login landing page may accept anonymous requests.')
+param authReady string
+
 var resourceSuffix = take(uniqueString(subscription().id, resourceGroup().id, environmentName), 6)
 var tags = {
   'azd-env-name': environmentName
@@ -42,6 +52,7 @@ var applicationInsightsName = 'appi-irontrail-${resourceSuffix}'
 var containerAppsEnvironmentName = 'cae-irontrail-${resourceSuffix}'
 var containerAppName = 'ca-irontrail-${resourceSuffix}'
 var placeholderImage = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+var unauthenticatedClientAction = toLower(authReady) == 'true' ? 'AllowAnonymous' : 'Return401'
 var tableEndpoint = 'https://${storageAccountName}.table.${environment().suffixes.storage}'
 var foundryEndpoint = 'https://${foundryAccountName}.cognitiveservices.azure.com/'
 
@@ -284,7 +295,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.23.0' = {
     activeRevisionsMode: 'Single'
     authConfig: {
       globalValidation: {
-        unauthenticatedClientAction: 'AllowAnonymous'
+        unauthenticatedClientAction: unauthenticatedClientAction
       }
       httpSettings: {
         requireHttps: true
@@ -319,12 +330,36 @@ module containerApp 'br/public:avm/res/app/container-app:0.23.0' = {
             value: 'aad'
           }
           {
+            name: 'IRONTRAIL_MAX_USERS'
+            value: '1'
+          }
+          {
+            name: 'IRONTRAIL_OWNER_OBJECT_ID'
+            value: ownerObjectId
+          }
+          {
             name: 'IRONTRAIL_AZURE_OPENAI_DEPLOYMENT'
             value: modelDeploymentName
           }
           {
             name: 'IRONTRAIL_AZURE_OPENAI_ENDPOINT'
             value: foundryEndpoint
+          }
+          {
+            name: 'IRONTRAIL_AI_MAX_OUTPUT_TOKENS'
+            value: '1200'
+          }
+          {
+            name: 'IRONTRAIL_AI_MAX_RETRIES'
+            value: '0'
+          }
+          {
+            name: 'IRONTRAIL_AI_REASONING_EFFORT'
+            value: 'minimal'
+          }
+          {
+            name: 'IRONTRAIL_BLOB_RECOVERY_DAYS'
+            value: '7'
           }
           {
             name: 'IRONTRAIL_BOOTSTRAP_INVITE_HASH'
@@ -352,7 +387,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.23.0' = {
         probes: [
           {
             httpGet: {
-              path: '/'
+              path: '/_stcore/health'
               port: 80
             }
             initialDelaySeconds: 10
@@ -361,7 +396,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.23.0' = {
           }
           {
             httpGet: {
-              path: '/'
+              path: '/_stcore/health'
               port: 80
             }
             initialDelaySeconds: 5

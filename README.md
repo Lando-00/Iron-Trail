@@ -303,15 +303,19 @@ expander on the Overview page — add a row for each.
 - Uploaded bytes stay in the local Streamlit session.
 - Vault writeback is explicit and targets a path you choose.
 
-**Prepared Azure private-beta mode**
+**Prepared Azure owner-only beta mode**
 
-- Microsoft/Google identities pass through Container Apps Easy Auth, then an
-  application-level single-use invite gate.
+- Stage C uses Microsoft Entra ID for the assigned owner. Google and tester
+  invitations remain deferred.
 - Storage keys are partitioned by an opaque ID derived from the immutable
   provider principal, not display name or filename.
 - Uploads remain session-only unless the user selects **Save privately**.
-- Saved raw files expire after 30 days; normalized data expires after 60 days.
-- Users can export or delete their saved datasets.
+- Active raw files expire after 30 days; active normalized data expires after
+  60 days. Azure Blob soft delete permits privileged recovery for seven
+  additional days (37/67 days maximum).
+- Users can export saved datasets or remove them from active IronTrail access.
+  Deleted blobs can remain recoverable by privileged Azure operators for up to
+  seven days.
 - Raw CSVs, raw heart-rate samples, free-text notes, and export files are not
   sent to the hosted model. The Coach receives deterministic aggregates.
 - The cloud image does not contain the Copilot SDK or the owner's credentials.
