@@ -1,6 +1,6 @@
 # IronTrail Azure Deployment Plan
 
-> **Status:** Stage C approved - preparation in progress
+> **Status:** Ready for Validation
 
 Generated: 2026-07-11  
 Last verified: 2026-07-18
@@ -829,11 +829,12 @@ Autopilot must stop before:
 
 ### Stage C: Full validation and website deployment - later explicit stage
 
-- [ ] Verify lifecycle prefixes; fix health probes, owner binding, session cleanup,
+- [x] Verify lifecycle prefixes; fix health probes, owner binding, session cleanup,
   Foundry minimal reasoning/zero retries, and owner-only settings.
-- [ ] Create the dedicated assigned Entra app and private bootstrap material.
-- [ ] Configure AZD `beta` and enforce the deployment preview allowlist.
-- [ ] Update this status to `Ready for Validation`.
+- [x] Create the dedicated assigned Entra app and private bootstrap material.
+- [x] Configure the private AZD `beta` environment.
+- [ ] Enforce the deployment preview allowlist.
+- [x] Update this status to `Ready for Validation`.
 - [ ] Invoke `azure-validate` for the complete architecture.
 - [ ] Verify local and containerized application behavior.
 - [ ] Deploy fail-closed with Microsoft owner login; Google remains deferred.
@@ -875,6 +876,11 @@ to `Validated`.
 | Synthetic proof | Private resumable ledger | Stopped on accepted empty completion at call 1; no replay | 2026-07-15 |
 | Azure Monitor call evidence | `AzureOpenAIRequests`, `InputTokens`, `OutputTokens` | HTTP 200; 1 request; 58 input; 300 output | 2026-07-15 |
 | Foundry billing attribution | Authenticated Cost Management query filtered to `rg-IronTrail` | EUR 0.000585690382 on `irontrail-resource` | 2026-07-18 |
+| Stage C preparation tests | `ruff check .`; `python -m pytest -q` | 66 passed | 2026-07-18 |
+| Stage C Bicep | `az bicep build --file infra/main.bicep --stdout` | Pass | 2026-07-18 |
+| Stage C production image | Docker build; root + `/_stcore/health`; UID/package inspection | HTTP 200; UID 10001; no Copilot SDK | 2026-07-18 |
+| Stage C Entra app | Single tenant, assignment required, owner assigned, no Graph permissions | Pass; redirect intentionally absent | 2026-07-18 |
+| AZD environment | Private `beta` values and secret-presence checks | Target/location/owner/authReady verified | 2026-07-18 |
 
 ---
 
@@ -912,7 +918,7 @@ to `Validated`.
 
 ## 16. Next Step
 
-Implement the approved preparation fixes, create the owner-assigned Entra
-registration and private AZD `beta` environment, then hand off through
-`azure-validate`. Only validated artifacts may proceed through `azure-deploy`.
-Google and testers remain deferred.
+Invoke `azure-validate`. Run the provision preview, machine-enforced what-if,
+policy/quota/RBAC/package/leak checks, and baseline capture. Only a fully
+`Validated` plan may proceed through `azure-deploy`. Google and testers remain
+deferred.
