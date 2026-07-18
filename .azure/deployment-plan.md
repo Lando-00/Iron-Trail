@@ -890,6 +890,8 @@ to `Validated`.
 | Static RBAC | UAMI role mapping for ACR, Blob, Table, Key Vault, Foundry | Five approved roles, one principal reference | 2026-07-18 |
 | Privacy/secret boundary | Tracked-file scan, raw/processed inventory, ignored private AZD environment | No secret matches; only `.gitkeep` data tracked | 2026-07-18 |
 | Predeployment baseline | Resources, RBAC, policy, provider, cost, Foundry deployment/quota | Two existing Foundry resources; one model; quota 10/300 | 2026-07-18 |
+| First application publish | `azd deploy --no-prompt` | Stopped before publish: AZD requires canonical `linux/amd64`, not `amd64` | 2026-07-18 |
+| Publish metadata fix | `linux/amd64`; Ruff/pytest; AZD schema/package/preview | 69 passed; package and preview pass | 2026-07-18 |
 
 ---
 

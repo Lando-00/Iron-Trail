@@ -35,3 +35,10 @@ def test_stage_c_bicep_is_owner_only_and_fail_closed() -> None:
     assert application.count("principalType: 'ServicePrincipal'") >= 5
     assert "${IRONTRAIL_OWNER_OBJECT_ID}" in parameters
     assert "${IRONTRAIL_AUTH_READY}" in parameters
+
+
+def test_azd_remote_build_targets_canonical_linux_amd64() -> None:
+    azure_yaml = (ROOT / "azure.yaml").read_text(encoding="utf-8")
+
+    assert "platform: linux/amd64" in azure_yaml
+    assert "platform: amd64" not in azure_yaml
