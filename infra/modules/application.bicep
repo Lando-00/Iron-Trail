@@ -186,6 +186,11 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.32.1' = {
     ]
     minimumTlsVersion: 'TLS1_2'
     name: storageAccountName
+    networkAcls: {
+      bypass: 'AzureServices'
+      defaultAction: 'Allow'
+    }
+    publicNetworkAccess: 'Enabled'
     roleAssignments: [
       {
         principalId: managedIdentity.outputs.principalId

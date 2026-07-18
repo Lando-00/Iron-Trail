@@ -14,6 +14,10 @@ def test_stage_c_bicep_uses_matching_lifecycle_and_health_paths() -> None:
     assert "'datasets/raw/'" in application
     assert "'datasets/normalized/'" in application
     assert application.count("path: '/_stcore/health'") == 2
+    assert "publicNetworkAccess: 'Enabled'" in application
+    assert "defaultAction: 'Allow'" in application
+    assert "allowSharedKeyAccess: false" in application
+    assert "allowBlobPublicAccess: false" in application
 
 
 def test_stage_c_bicep_is_owner_only_and_fail_closed() -> None:
