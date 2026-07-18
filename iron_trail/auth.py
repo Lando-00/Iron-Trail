@@ -125,6 +125,16 @@ def identity_from_headers(headers: Mapping[str, str]) -> Identity | None:
         except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise AuthenticationError("Invalid platform identity header.") from exc
 
+    if provider == "aad":
+        object_id = _first_claim(
+            claims,
+            (
+                "http://schemas.microsoft.com/identity/claims/objectidentifier",
+                "oid",
+            ),
+        )
+        if object_id:
+            principal_id = object_id
     if not principal_id:
         principal_id = _first_claim(
             claims,

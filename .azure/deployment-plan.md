@@ -894,6 +894,7 @@ to `Validated`.
 | Publish metadata fix | `linux/amd64`; Ruff/pytest; AZD schema/package/preview | 69 passed; package and preview pass | 2026-07-18 |
 | First authenticated owner request | Microsoft login through Easy Auth | Failed closed: Storage firewall denied UAMI Table access | 2026-07-18 |
 | Storage firewall correction | Public endpoint enabled; default action Allow; shared keys/public blobs remain disabled | 69 tests, Bicep, subscription validation pass | 2026-07-18 |
+| Owner bootstrap identity normalization | Prefer immutable AAD object-ID claim over generic Easy Auth header | 70 tests; production image health passes | 2026-07-18 |
 
 ---
 

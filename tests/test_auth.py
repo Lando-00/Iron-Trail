@@ -97,6 +97,31 @@ def test_identity_parses_easy_auth_claim_payload() -> None:
     assert identity == Identity("aad", "object-123", "Tester")
 
 
+def test_aad_identity_prefers_object_id_claim_over_generic_header() -> None:
+    payload = {
+        "auth_typ": "aad",
+        "claims": [
+            {
+                "typ": "http://schemas.microsoft.com/identity/claims/objectidentifier",
+                "val": "owner-object-id",
+            },
+            {"typ": "sub", "val": "pairwise-subject"},
+            {"typ": "name", "val": "Owner"},
+        ],
+    }
+    encoded = base64.b64encode(json.dumps(payload).encode()).decode()
+
+    identity = identity_from_headers(
+        {
+            "X-MS-CLIENT-PRINCIPAL-ID": "generic-principal-header",
+            "X-MS-CLIENT-PRINCIPAL-IDP": "aad",
+            "X-MS-CLIENT-PRINCIPAL": encoded,
+        }
+    )
+
+    assert identity == Identity("aad", "owner-object-id", "Owner")
+
+
 def test_bootstrap_invite_creates_the_only_initial_admin() -> None:
     repo = InMemoryAuthRepository()
     bootstrap_code = "owner-bootstrap-code"
