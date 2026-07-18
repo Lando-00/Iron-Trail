@@ -15,7 +15,7 @@ from typing import Protocol
 
 import streamlit as st
 
-from . import runtime
+from . import beta_landing, runtime
 
 _USER_NAMESPACE = uuid.UUID("25b64e27-4acd-4e23-8b94-2a0657200fb4")
 _AUTH_PARTITION = "auth"
@@ -23,6 +23,7 @@ _SENSITIVE_SESSION_KEYS = {
     "csv_upload_widget",
     "it_current_user",
     "it_current_user_checked_at",
+    "it_authenticated_identity_seen",
     "it_data_export_bytes",
     "it_new_invite_code",
     "it_saved_upload_id",
@@ -201,10 +202,17 @@ def require_invited_user(repository: AuthRepository | None = None) -> User:
         st.stop()
 
     if identity is None:
+        had_authenticated_identity = bool(
+            st.session_state.get("it_authenticated_identity_seen")
+        )
         clear_sensitive_session_state()
+        if had_authenticated_identity:
+            beta_landing.reset_session_state()
         _render_login()
         st.stop()
 
+    st.session_state["it_authenticated_identity_seen"] = identity.user_id
+    beta_landing.reset_session_state()
     try:
         repo = repository or get_auth_repository()
     except runtime.ConfigurationError:
@@ -360,13 +368,7 @@ def _is_bootstrap_owner(identity: Identity, bootstrap_owner_id: str) -> bool:
 
 
 def _render_login() -> None:
-    st.title("IronTrail private beta")
-    st.write("Sign in with an approved identity, then redeem your one-time invite code.")
-    providers = runtime.auth_providers()
-    if "aad" in providers:
-        st.markdown("[Continue with Microsoft](/.auth/login/aad?post_login_redirect_uri=/)")
-    if "google" in providers:
-        st.markdown("[Continue with Google](/.auth/login/google?post_login_redirect_uri=/)")
+    beta_landing.render_login(runtime.auth_providers())
 
 
 def _render_invite_gate(identity: Identity, repository: AuthRepository) -> None:

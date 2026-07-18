@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 from datetime import timedelta
+from types import SimpleNamespace
 
 import pytest
 
@@ -261,3 +262,63 @@ def test_sensitive_session_state_is_cleared(monkeypatch) -> None:
     auth.clear_sensitive_session_state()
 
     assert state == {"invite_widget_state": "preserve"}
+
+
+def test_authenticated_marker_is_sensitive_session_state(monkeypatch) -> None:
+    from iron_trail import auth
+
+    state = {
+        "it_authenticated_identity_seen": "owner-id",
+        "beta_reveal_state": "preserve-until-logout-transition",
+    }
+    monkeypatch.setattr(auth.st, "session_state", state)
+
+    auth.clear_sensitive_session_state()
+
+    assert state == {"beta_reveal_state": "preserve-until-logout-transition"}
+
+
+def test_initial_anonymous_rerun_preserves_reveal_progress(monkeypatch) -> None:
+    from iron_trail import auth, beta_landing
+
+    class _Stopped(Exception):
+        pass
+
+    reveal = beta_landing.RevealState(emoji_index=2, control_hits=3)
+    state = {"beta_reveal_state": reveal}
+    monkeypatch.setattr(auth.runtime, "is_cloud", lambda: True)
+    monkeypatch.setattr(auth.st, "context", SimpleNamespace(headers={}))
+    monkeypatch.setattr(auth.st, "session_state", state)
+    monkeypatch.setattr(auth, "identity_from_headers", lambda _headers: None)
+    monkeypatch.setattr(auth, "_render_login", lambda: None)
+    monkeypatch.setattr(auth.st, "stop", lambda: (_ for _ in ()).throw(_Stopped()))
+
+    with pytest.raises(_Stopped):
+        auth.require_invited_user()
+
+    assert state["beta_reveal_state"] == reveal
+
+
+def test_logout_transition_resets_reveal_progress(monkeypatch) -> None:
+    from iron_trail import auth, beta_landing
+
+    class _Stopped(Exception):
+        pass
+
+    state = {
+        "it_authenticated_identity_seen": "owner-id",
+        "beta_reveal_state": beta_landing.RevealState(revealed=True),
+        "beta_reveal_emoji_button": True,
+    }
+    monkeypatch.setattr(auth.runtime, "is_cloud", lambda: True)
+    monkeypatch.setattr(auth.st, "context", SimpleNamespace(headers={}))
+    monkeypatch.setattr(auth.st, "session_state", state)
+    monkeypatch.setattr(auth, "identity_from_headers", lambda _headers: None)
+    monkeypatch.setattr(auth, "_render_login", lambda: None)
+    monkeypatch.setattr(auth.st, "stop", lambda: (_ for _ in ()).throw(_Stopped()))
+
+    with pytest.raises(_Stopped):
+        auth.require_invited_user()
+
+    assert "beta_reveal_state" not in state
+    assert "beta_reveal_emoji_button" not in state

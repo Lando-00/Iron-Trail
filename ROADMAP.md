@@ -107,12 +107,17 @@ The hosted path keeps the local app intact and adds a separate cloud mode:
 - Container Apps Consumption with scale-to-zero and one maximum replica while
   Streamlit state remains process-local.
 - Docker, AZD, Bicep, monitoring, RBAC, lifecycle, and budget definitions.
+- A **Private Beta in Progress** anonymous landing screen with accessible
+  fireworks and a server-seeded discovery sequence that reveals sign-in
+  without weakening the Easy Auth or application authorization boundary.
 
 Stage C is deployed and live-tested at the Azure-provided URL. Microsoft owner
 login, session-only isolation, opt-in persistence, export, delete-selected,
 Delete All, lifecycle recovery, Foundry reviews, monitoring, RBAC, and cost
-guardrails have passed. Google OAuth, tester invitations, and live two-user
-isolation remain the mandatory Stage C2 gate before expanding access.
+guardrails have passed. The final landing page also passed live wrong-sequence,
+successful-reveal, mobile, reduced-motion, and owner-login acceptance. Google
+OAuth, tester invitations, and live two-user isolation remain the mandatory
+Stage C2 gate before expanding access.
 
 ## Other ideas
 

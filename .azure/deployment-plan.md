@@ -852,6 +852,19 @@ Autopilot must stop before:
 - [x] Confirm monitoring and cost alerts.
 - [x] Record deployed endpoints and set status to `Deployed`.
 
+### Final post-Stage-C landing-page revamp
+
+- [x] Implement the private-beta landing page and server-side reveal state.
+- [x] Add focused auth and reveal tests.
+- [x] Verify desktop, mobile, keyboard, and reduced-motion behavior locally.
+- [x] Revalidate Ruff, pytest, the production container, Bicep, AZD preview,
+  packaging, providers, privacy boundaries, and live RBAC.
+- [x] Deploy the `web` service only, preserving the manually managed reveal
+  secret and environment reference.
+- [x] Complete anonymous and authenticated live acceptance.
+- [x] Record the final revision/image evidence, update project documentation,
+  commit, and push without merging.
+
 ---
 
 ## 13. Validation Proof
@@ -903,6 +916,24 @@ to `Validated`.
 | Live storage acceptance | Synthetic upload, managed-identity state checks, export, delete-selected, Delete All | Session-only wrote nothing; opt-in created one record/two blobs; export contained raw + normalized + manifest; final active state zero; four soft-deleted blobs | 2026-07-18 |
 | Hosted Coach acceptance | Usage ledger plus Azure OpenAI metrics | Two manually initiated synthetic reviews completed with exactly two requests, 4,185 input and 1,381 output tokens; no additional automation call sent | 2026-07-18 |
 | Live operations | Resource/RBAC/auth/storage/lifecycle/logging/budget/image checks | 11 approved resources; five UAMI roles; one healthy active revision; 0.25-GB/day logs; 30-day logs; EUR 25 budget at 40/80/100%; no recent log error/raw markers | 2026-07-18 |
+| Landing-page code | x64 `ruff check .`; x64 `python -m pytest -q`; `git diff --check` | Ruff clean; 83 passed; diff clean | 2026-07-18 |
+| Landing-page local UI | Headless Chromium against a managed temporary Streamlit server | Initial sign-in hidden; five fireworks; exact five-step reveal; mobile 390 px; reduced-motion animation disabled | 2026-07-18 |
+| Landing-page production image | Native Docker build; root + `/_stcore/health`; UID/package inspection | HTTP 200; UID 10001; no Copilot SDK | 2026-07-18 |
+| Landing-page AZD/Bicep | `azd show`; `az bicep build`; `azd provision --preview --no-prompt`; `azd package --no-prompt` | Schema/build/preview/package pass; no changes applied | 2026-07-18 |
+| Landing-page release boundary | Live secret-reference, provider, tag, UAMI role, and `AcrPull` checks | Reveal secret remains referenced; one tagged web app; seven providers registered; five exact UAMI roles | 2026-07-18 |
+| Landing-page application deployment | `azd deploy web --no-prompt` | Remote AMD64 build and publish succeeded in 2m26s | 2026-07-18 |
+| Landing-page live anonymous UI | Fresh headless Chromium sessions against the Azure URL | Initial sign-in hidden; wrong sequence rejected; exact reveal succeeded; mobile 390 px; reduced motion disabled animation | 2026-07-18 |
+| Landing-page live owner auth | Existing dedicated-browser Microsoft session through Easy Auth | Assigned owner reached the dashboard and account controls | 2026-07-18 |
+| Landing-page live operations | Revision, traffic, probes, secret, image, RBAC, endpoint, and log checks | One healthy active revision at 100%; HTTP 200; seed reference preserved; five UAMI roles; zero error/privacy log markers | 2026-07-18 |
+
+---
+
+The fresh provisioning preview was not applied. The reveal seed is currently a
+manually managed Container App secret and environment reference, so a full
+provision would reconcile that out-of-band configuration. This release is
+validated for an application-only `web` deployment. Before any future full
+provision, promote the seed to a secure IaC parameter and Key Vault-backed
+Container App secret reference.
 
 ---
 
@@ -926,6 +957,20 @@ generated both weekly and monthly synthetic reviews before automation issued a
 call. Both ledger rows completed and Azure Monitor recorded exactly two
 requests. No retry or further model request was sent.
 
+### Final private-beta landing release
+
+| Item | Result |
+|---|---|
+| Website | `https://ca-irontrail-t5padq.ambitiousbush-1b702384.northeurope.azurecontainerapps.io` |
+| Anonymous entry | Private-beta launch screen with five fireworks, mobile styling, and reduced-motion support |
+| Discovery interaction | Five rotating emojis and a server-seeded secondary-control sequence; wrong sequences remain closed |
+| Security boundary | The sequence reveals sign-in only; Easy Auth, owner assignment, application authorization, and invite validation remain server-side |
+| Active revision | `ca-irontrail-t5padq--azd-1784390346` |
+| Image | `crirontrailt5padq.azurecr.io/irontrail/web-beta:azd-deploy-1784390221` |
+| Image digest | `sha256:17777a559907a64eefea83a84253cfc069f851e666e5ff5871b3449dddb40b5f` |
+| Runtime | One healthy active revision, 100% traffic, min 0 / max 1, root and health HTTP 200 |
+| Release boundary | Feature branch only; Google, testers, Stage C2 isolation, and merge remain deferred |
+
 ---
 
 ## 15. Files to Generate
@@ -937,6 +982,7 @@ requests. No retry or further model request was sent.
 | `infra/main.bicep` and modules | Azure resources, roles, lifecycle, budgets; reference existing Foundry resources | Complete |
 | `Dockerfile`, `.dockerignore` | Reproducible Streamlit container | Complete |
 | `iron_trail/auth.py` | Easy Auth identity normalization and invite guard | Complete |
+| `iron_trail/beta_landing.py` | Private-beta launch page and cosmetic reveal state machine | Complete |
 | `iron_trail/cloud_storage.py` | User-partitioned Blob/Table persistence | Complete |
 | `iron_trail/coach/providers/azure_foundry.py` | Hosted AI provider | Complete |
 | `scripts/foundry_credit_proof.py` | Private-ledger Stage B deployment, call, quota, and cost proof runner | Complete |
@@ -962,7 +1008,7 @@ requests. No retry or further model request was sent.
 
 ## 17. Next Step
 
-Keep the deployed beta owner-only and invite nobody. Complete the separate
-post-Stage-C landing-page polish task, then require a new decision before any
-merge or public release. Google OAuth and live two-user isolation remain the
-mandatory Stage C2 gate before testers.
+Keep the deployed beta owner-only and invite nobody. Require a new decision
+before any merge or public release. Google OAuth and live two-user isolation
+remain the mandatory Stage C2 gate before testers. Before any future full
+provision, promote the reveal seed into the secure Bicep/Key Vault path.

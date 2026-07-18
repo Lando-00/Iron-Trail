@@ -19,7 +19,10 @@ that actually surfaces the things that matter weekly. **Local mode is still
 the default:** no account, no hosted storage, and your CSV stays on your disk.
 The repo also contains a separately gated Azure private-beta mode with
 authentication, user-isolated storage, retention limits, and a metered AI
-provider. The included 90-day synthetic dataset runs out of the box.
+provider. Its anonymous entry is a private-beta launch screen whose playful
+reveal interaction only discovers sign-in; Azure authentication and
+authorization remain the real access boundary. The included 90-day synthetic
+dataset runs out of the box.
 
 The differentiating bit vs prior art is **writeback into the vault**:
 every workout becomes `Vault/Hevy/Daily/YYYY-MM-DD.md` with frontmatter,
@@ -309,6 +312,10 @@ expander on the Overview page — add a row for each.
   invitations remain deferred.
 - The live owner-only beta is available at
   <https://ca-irontrail-t5padq.ambitiousbush-1b702384.northeurope.azurecontainerapps.io>.
+- Anonymous visitors see a **Private Beta in Progress** launch screen with
+  reduced-motion-aware fireworks and a server-seeded five-step discovery
+  interaction. It reveals the Microsoft sign-in link only; it never replaces
+  Easy Auth, owner assignment, invite validation, or application authorization.
 - Storage keys are partitioned by an opaque ID derived from the immutable
   provider principal, not display name or filename.
 - Uploads remain session-only unless the user selects **Save privately**.
@@ -351,6 +358,8 @@ See [`.azure/deployment-plan.md`](.azure/deployment-plan.md) for the exact
 architecture, phased approvals, cost assumptions, and hard-stop conditions.
 Stage C live acceptance is complete. The current release boundary remains one
 assigned Microsoft owner, no Google login, no testers, and no merge to `main`.
+The final private-beta landing page has also passed live wrong-sequence,
+successful-reveal, mobile, reduced-motion, and owner-login acceptance.
 
 ## Roadmap
 
