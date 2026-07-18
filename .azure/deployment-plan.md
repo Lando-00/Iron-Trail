@@ -1,6 +1,6 @@
 # IronTrail Azure Deployment Plan
 
-> **Status:** Validated
+> **Status:** Deployed
 
 Generated: 2026-07-11  
 Last verified: 2026-07-18
@@ -64,9 +64,11 @@ Implemented:
 
 Still deferred:
 
-- Any further Foundry inference after the stopped Stage B proof.
-- Any website infrastructure deployment.
-- Google OAuth setup, live identity tests, and live two-user isolation tests.
+- Google OAuth, tester invitations, and live two-user isolation testing
+  (Stage C2).
+- Samsung Health, Health Connect, Analytics Lab, a custom domain, and private
+  networking.
+- Merge to `main` or any public/tester rollout.
 
 ---
 
@@ -87,7 +89,7 @@ Still deferred:
 | Normalized retention | 60 days |
 | AI budget behavior | Disable hosted AI until the next month when the hard cap is reached |
 | Custom domain | Deferred |
-| Current execution scope | Stage C validation planning; no website deployment approved yet |
+| Current execution scope | Stage C owner-only beta deployed and accepted; Stage C2 remains blocked before testers |
 
 ### Policy constraints
 
@@ -837,18 +839,18 @@ Autopilot must stop before:
 - [x] Update this status to `Ready for Validation`.
 - [x] Invoke `azure-validate` for the complete architecture.
 - [x] Verify local and containerized application behavior.
-- [ ] Deploy fail-closed with Microsoft owner login; Google remains deferred.
-- [ ] Complete and verify the owner bootstrap checkpoint.
-- [ ] Keep automated two-identity isolation tests; defer live cross-user testing
+- [x] Deploy fail-closed with Microsoft owner login; Google remains deferred.
+- [x] Complete and verify the owner bootstrap checkpoint.
+- [x] Keep automated two-identity isolation tests; defer live cross-user testing
   to Stage C2 before testers.
-- [ ] Verify opt-in persistence and 30/60-day expiry configuration.
-- [ ] Verify AI quotas, global disable behavior, and no Copilot credentials.
+- [x] Verify opt-in persistence and 30/60-day expiry configuration.
+- [x] Verify AI quotas, global disable behavior, and no Copilot credentials.
 - [x] Record validation proof and set status to `Validated`.
 
-- [ ] Invoke `azure-deploy`.
-- [ ] Smoke-test the Azure-provided URL.
-- [ ] Confirm monitoring and cost alerts.
-- [ ] Record deployed endpoints and set status to `Deployed`.
+- [x] Invoke `azure-deploy`.
+- [x] Smoke-test the Azure-provided URL.
+- [x] Confirm monitoring and cost alerts.
+- [x] Record deployed endpoints and set status to `Deployed`.
 
 ---
 
@@ -895,10 +897,38 @@ to `Validated`.
 | First authenticated owner request | Microsoft login through Easy Auth | Failed closed: Storage firewall denied UAMI Table access | 2026-07-18 |
 | Storage firewall correction | Public endpoint enabled; default action Allow; shared keys/public blobs remain disabled | 69 tests, Bicep, subscription validation pass | 2026-07-18 |
 | Owner bootstrap identity normalization | Prefer immutable AAD object-ID claim over generic Easy Auth header | 70 tests; production image health passes | 2026-07-18 |
+| Adherence slider live-UI fix | `ruff check .`; `python -m pytest -q`; synthetic Playwright interaction; Bicep; AZD preview/package; native container health | 74 passed; slider 16 -> 12 -> 8 with visible calendar contraction; Bicep/preview/package pass; HTTP 200, UID 10001, no Copilot SDK | 2026-07-18 |
+| Application deployment | `azd deploy web --no-prompt` | Remote AMD64 build and publish succeeded; healthy revision received 100% traffic | 2026-07-18 |
+| Live owner UI | Microsoft login, logout/re-login, page sweep, Adherence interaction | All seven routes rendered; session upload purged on logout; slider live-confirmed | 2026-07-18 |
+| Live storage acceptance | Synthetic upload, managed-identity state checks, export, delete-selected, Delete All | Session-only wrote nothing; opt-in created one record/two blobs; export contained raw + normalized + manifest; final active state zero; four soft-deleted blobs | 2026-07-18 |
+| Hosted Coach acceptance | Usage ledger plus Azure OpenAI metrics | Two manually initiated synthetic reviews completed with exactly two requests, 4,185 input and 1,381 output tokens; no additional automation call sent | 2026-07-18 |
+| Live operations | Resource/RBAC/auth/storage/lifecycle/logging/budget/image checks | 11 approved resources; five UAMI roles; one healthy active revision; 0.25-GB/day logs; 30-day logs; EUR 25 budget at 40/80/100%; no recent log error/raw markers | 2026-07-18 |
 
 ---
 
-## 14. Files to Generate
+## 14. Stage C Deployment Result
+
+| Item | Result |
+|---|---|
+| Website | `https://ca-irontrail-t5padq.ambitiousbush-1b702384.northeurope.azurecontainerapps.io` |
+| Access | Microsoft-assigned owner only; bootstrap claimed; max users 1 |
+| Active revision | `ca-irontrail-t5padq--azd-1784384798` |
+| Image | `crirontrailt5padq.azurecr.io/irontrail/web-beta:azd-deploy-1784384693` |
+| Image digest | `sha256:85cc6220965746ad945ad4d913a8775b69973161eda7a0db228144d5b7ae60c7` |
+| Scale | Consumption, min 0 / max 1, one healthy active revision |
+| Storage final state | Zero active datasets and blobs; four synthetic test blobs soft-deleted for seven-day recovery proof |
+| Foundry | `gpt-5-mini` `2025-08-07`, DataZoneStandard 10 of 300 quota |
+| Cost visibility | EUR 0.000585690382 remains the latest attributed Cost Management row; website meters had not yet ingested |
+| Release boundary | Feature branch only; Google, testers, Stage C2 isolation, and merge remain deferred |
+
+The approved Coach smoke boundary was overtaken by manual acceptance: the owner
+generated both weekly and monthly synthetic reviews before automation issued a
+call. Both ledger rows completed and Azure Monitor recorded exactly two
+requests. No retry or further model request was sent.
+
+---
+
+## 15. Files to Generate
 
 | File/component | Purpose | Status |
 |---|---|---|
@@ -915,7 +945,7 @@ to `Validated`.
 
 ---
 
-## 15. Git and Release Boundary
+## 16. Git and Release Boundary
 
 - Do not push the Samsung commit yet.
 - Do not amend or squash the existing Samsung commit.
@@ -930,9 +960,9 @@ to `Validated`.
 
 ---
 
-## 16. Next Step
+## 17. Next Step
 
-Invoke `azure-deploy` for the validated owner-only `beta` environment.
-Provision and deploy fail-closed with `Return401`, record `WEB_URL`, then
-configure the exact Entra callback and apply the narrow `authReady=true`
-update. Google and testers remain deferred.
+Keep the deployed beta owner-only and invite nobody. Complete the separate
+post-Stage-C landing-page polish task, then require a new decision before any
+merge or public release. Google OAuth and live two-user isolation remain the
+mandatory Stage C2 gate before testers.

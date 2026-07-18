@@ -303,10 +303,12 @@ expander on the Overview page — add a row for each.
 - Uploaded bytes stay in the local Streamlit session.
 - Vault writeback is explicit and targets a path you choose.
 
-**Prepared Azure owner-only beta mode**
+**Deployed Azure owner-only beta**
 
 - Stage C uses Microsoft Entra ID for the assigned owner. Google and tester
   invitations remain deferred.
+- The live owner-only beta is available at
+  <https://ca-irontrail-t5padq.ambitiousbush-1b702384.northeurope.azurecontainerapps.io>.
 - Storage keys are partitioned by an opaque ID derived from the immutable
   provider principal, not display name or filename.
 - Uploads remain session-only unless the user selects **Save privately**.
@@ -336,7 +338,7 @@ expander on the Overview page — add a row for each.
 
 ## Deployment — Azure private beta
 
-The deployment path is Azure Developer CLI + Bicep:
+The owner-only beta is deployed through Azure Developer CLI + Bicep:
 
 - Azure Container Apps Consumption, scale-to-zero, maximum one replica.
 - Private Blob/Table storage with managed identity and lifecycle policies.
@@ -347,8 +349,8 @@ The deployment path is Azure Developer CLI + Bicep:
 
 See [`.azure/deployment-plan.md`](.azure/deployment-plan.md) for the exact
 architecture, phased approvals, cost assumptions, and hard-stop conditions.
-The code-first stage does **not** authorize `azd provision` or `azd up`; model
-credit proof and website deployment are separate later gates.
+Stage C live acceptance is complete. The current release boundary remains one
+assigned Microsoft owner, no Google login, no testers, and no merge to `main`.
 
 ## Roadmap
 
@@ -357,8 +359,9 @@ See [`ROADMAP.md`](./ROADMAP.md). TL;DR:
 - **Phase 1 — Done.** The dashboard you see in the screenshots above.
 - **Phase 2 — AI Training Coach.** Weekly LLM-written review note in the
   vault.
-- **Private beta — code first.** Authentication, storage isolation, Foundry,
-  usage limits, container packaging, and Azure IaC.
+- **Private beta — owner-only deployed.** Authentication, storage isolation,
+  Foundry, usage limits, retention, export/deletion, and Azure operations are
+  live-tested.
 - **Cross-source.** Samsung Health recovery context, then an Android Health
   Connect companion; do not build new integrations on deprecated Google Fit.
 

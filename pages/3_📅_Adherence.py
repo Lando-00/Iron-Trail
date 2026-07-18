@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from iron_trail import analytics, metrics, sidebar, theme, ui
+from iron_trail import adherence, analytics, metrics, sidebar, theme, ui
 
 ui.setup_page("Adherence · IronTrail", "📅")
 
@@ -28,20 +28,45 @@ if arch.empty:
     st.info("No sessions to classify.")
     st.stop()
 
-window_weeks = st.slider("Weeks to show", min_value=8, max_value=104, value=52, step=4)
-end = pd.to_datetime(arch["workout_date"]).max()
+arch["date"] = pd.to_datetime(arch["workout_date"], errors="coerce")
+arch = arch.dropna(subset=["date"])
+if arch.empty:
+    st.info("No dated sessions to display.")
+    st.stop()
+
+max_window_weeks = adherence.max_calendar_window_weeks(arch["date"])
+if max_window_weeks == adherence.MIN_WINDOW_WEEKS:
+    window_weeks = adherence.MIN_WINDOW_WEEKS
+    st.caption("All available sessions fit within the last 8 weeks.")
+else:
+    window_weeks = st.slider(
+        "Weeks to show",
+        min_value=adherence.MIN_WINDOW_WEEKS,
+        max_value=max_window_weeks,
+        value=min(adherence.DEFAULT_WINDOW_WEEKS, max_window_weeks),
+        step=adherence.WINDOW_STEP_WEEKS,
+        help="The range is limited to the workout history currently loaded.",
+    )
+
+end = arch["date"].max()
 start = end - pd.Timedelta(weeks=window_weeks)
 arch_window = arch.copy()
-arch_window["date"] = pd.to_datetime(arch_window["workout_date"])
 arch_window = arch_window[arch_window["date"] >= start]
 
 if arch_window.empty:
     st.info("No sessions in selected window.")
 else:
+    visible_start = arch_window["date"].min()
+    st.caption(
+        f"Showing {len(arch_window)} of {len(arch)} sessions from "
+        f"{visible_start:%d %b %Y} to {end:%d %b %Y}."
+    )
     arch_window["week_start"] = arch_window["date"].dt.to_period("W-SUN").dt.start_time
     day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     arch_window["dow_idx"] = arch_window["date"].dt.dayofweek
     arch_window["dow_name"] = arch_window["dow_idx"].map(dict(enumerate(day_names)))
+    axis_start = start.to_period("W-SUN").start_time
+    axis_end = end.to_period("W-SUN").start_time + pd.Timedelta(days=7)
 
     fig = go.Figure()
     for arche, sub in arch_window.groupby("archetype"):
@@ -65,7 +90,7 @@ else:
         ))
     fig.update_layout(
         height=320,
-        xaxis=dict(title=""),
+        xaxis=dict(title="", range=[axis_start, axis_end]),
         yaxis=dict(
             tickmode="array",
             tickvals=list(range(7)),

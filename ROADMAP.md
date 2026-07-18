@@ -93,7 +93,7 @@ Triggered when CSV re-export becomes the actual blocker.
   the public [Symmetric Strength](https://symmetricstrength.com/) tables so
   every lift gets a "you're in the top X% for your bracket" badge.
 
-## Private Azure beta — Code-first
+## Private Azure beta — Owner-only deployed
 
 The hosted path keeps the local app intact and adds a separate cloud mode:
 
@@ -108,9 +108,11 @@ The hosted path keeps the local app intact and adds a separate cloud mode:
   Streamlit state remains process-local.
 - Docker, AZD, Bicep, monitoring, RBAC, lifecycle, and budget definitions.
 
-Deployment remains phased: first validate the code and IaC; later deploy only
-the model to prove Visual Studio credit billing; deploy the website only after
-that proof succeeds.
+Stage C is deployed and live-tested at the Azure-provided URL. Microsoft owner
+login, session-only isolation, opt-in persistence, export, delete-selected,
+Delete All, lifecycle recovery, Foundry reviews, monitoring, RBAC, and cost
+guardrails have passed. Google OAuth, tester invitations, and live two-user
+isolation remain the mandatory Stage C2 gate before expanding access.
 
 ## Other ideas
 
