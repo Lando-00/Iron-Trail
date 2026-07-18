@@ -27,9 +27,9 @@ domain in the first release.
 | Local branch | `main` at `334c530`, one commit ahead |
 | Samsung Health | Parsing/summary foundation committed locally; not pushed |
 | Samsung verification | 52 targeted tests pass; real export verification pending |
-| Full test suite | Collection currently fails because `scripts/test_upload.py` executes during import |
-| Ruff | 24 existing findings outside the new health package |
-| Untracked | `.azure/`, `scripts/spike_copilot_sdk.py`, `scripts/test_pdf_output.pdf` |
+| Full test suite | 53 tests passing on the x64 Python 3.12 environment |
+| Ruff | Clean |
+| Untracked | Only the intentionally untouched `scripts/spike_copilot_sdk.py` and `scripts/test_pdf_output.pdf` |
 | Streamlit runtime | Offline |
 | Azure resource group | `rg-IronTrail` exists in Sweden Central |
 | Foundry account | `irontrail-resource`, AIServices S0, provisioning succeeded |
@@ -38,7 +38,7 @@ domain in the first release.
 | Model deployments | `gpt-5-mini` DataZoneStandard at 10K TPM; retained idle |
 | Hosting branch | `feature/azure-hosting` |
 | Stage A implementation | Complete and locally validated |
-| Remote branch | Stage B code pushed through `aa25a44` without merging |
+| Remote branch | Pushed at `462fb1e` without merging |
 
 The Samsung commit remains local until a later explicit push approval. The
 public repository must never contain a real Hevy, Samsung Health, Health
