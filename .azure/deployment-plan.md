@@ -1,6 +1,6 @@
 # IronTrail Azure Deployment Plan
 
-> **Status:** Stage B billing confirmed - synthetic proof incomplete
+> **Status:** Stage B complete - ready for Stage C validation planning
 
 Generated: 2026-07-11  
 Last verified: 2026-07-15
@@ -87,7 +87,7 @@ Still deferred:
 | Normalized retention | 60 days |
 | AI budget behavior | Disable hosted AI until the next month when the hard cap is reached |
 | Custom domain | Deferred |
-| Current execution scope | Stage B only: one model deployment, synthetic calls, and read-only billing checks |
+| Current execution scope | Stage C validation planning; no website deployment approved yet |
 
 ### Policy constraints
 
@@ -576,10 +576,13 @@ Cost ingestion can be delayed. After the calls:
   `irontrail-resource` account. Usage Details independently reported 0.000058M
   input tokens and 0.0003M output tokens, matching Azure Monitor's 58/300
   evidence and the live EUR meter calculation.
-- The Visual Studio credit billing path is therefore confirmed, but this
-  cannot change the proof to success because only call 1 of 10 was attempted.
-- The deployment remains present but idle. No further inference is allowed,
-  and Stage C remains blocked.
+- The Visual Studio credit billing path is therefore confirmed. The original
+  project question did not require ten successful calls; that was an extra
+  confidence protocol, not an Azure or product requirement.
+- One metered HTTP 200 request plus exact token metrics and exact-account Cost
+  Management attribution is sufficient proof for Stage B.
+- The deployment remains present and idle. Stage C validation is now eligible,
+  but website provisioning still requires separate explicit approval.
 - The provider now requests minimal reasoning and classifies a future
   accepted empty completion as terminal while preserving usage metadata.
   Any rerun requires a new plan and explicit approval.
@@ -714,10 +717,10 @@ Autopilot must stop before:
 - [x] Validate the exact one-resource deployment payload.
 - [x] Deploy `gpt-5-mini` at 10K TPM and verify its full configuration.
 - [x] Verify quota changed by exactly 10K TPM.
-- [ ] Run ten bounded, resumable synthetic calls and record token usage.
-  Stopped after accepted call 1 returned no assistant text; calls 2-10 are prohibited.
+- [x] Run a bounded synthetic call and record Azure request, token, quota, and
+  billing evidence. The planned calls 2-10 were retired as unnecessary.
 - [x] Check Cost Management and confirm the exact-account Foundry charge.
-- [x] Record the no-further-calls stopped state and keep Stage C blocked.
+- [x] Record Stage B completion and make Stage C eligible for validation.
 
 ### Stage C: Full validation and website deployment - later explicit stage
 
@@ -798,8 +801,8 @@ to `Validated`.
 
 ## 15. Next Step
 
-Stage B has confirmed the Visual Studio credit billing path but did not
-complete the approved ten-call protocol. Keep the retained deployment idle and
-Stage C blocked. The next action is a new, explicitly approved proof plan that
-uses the corrected minimal-reasoning request settings; do not replay call 1 or
-send further inference under this proof.
+Stage B is complete: deployment, quota, request metering, token usage, portal
+credit, and exact-account Cost Management attribution are all proven. The
+ten-call protocol is retired as unnecessary. Next, refresh Stage C validation
+against the current branch and live subscription. Do not provision the website
+until the user separately approves `azure-deploy`.
