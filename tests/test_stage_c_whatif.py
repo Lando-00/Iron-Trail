@@ -154,3 +154,52 @@ def test_stage_c_whatif_rejects_missing_changes() -> None:
     assert validate({"properties": {}}) == [
         "What-if payload is missing the changes field."
     ]
+
+
+def symbolic_role(scope: str, role_id: str, *, identity_suffix: str = "abc123") -> str:
+    identity = rg_resource(
+        "providers/Microsoft.ManagedIdentity/userAssignedIdentities/"
+        f"id-irontrail-{identity_suffix}"
+    )
+    role_definition = (
+        f"/subscriptions/{SUBSCRIPTION}/providers/Microsoft.Authorization/"
+        f"roleDefinitions/{role_id}"
+    )
+    return (
+        "[extensionResourceId("
+        f"'{scope}', 'Microsoft.Authorization/roleAssignments', "
+        f"guid('{scope}', reference('{identity}', '2024-11-30').principalId, "
+        f"'{role_definition}'))]"
+    )
+
+
+def test_stage_c_whatif_accepts_expected_symbolic_role_assignment() -> None:
+    scope = rg_resource(
+        f"providers/Microsoft.CognitiveServices/accounts/{FOUNDRY}"
+    )
+
+    result = validate(
+        payload(
+            change(
+                "Unsupported",
+                symbolic_role(scope, whatif.ROLE_IDS["foundry_user"]),
+            )
+        )
+    )
+
+    assert result == []
+
+
+def test_stage_c_whatif_rejects_symbolic_role_for_wrong_identity() -> None:
+    scope = rg_resource(
+        f"providers/Microsoft.CognitiveServices/accounts/{FOUNDRY}"
+    )
+    resource_id = symbolic_role(scope, whatif.ROLE_IDS["foundry_user"]).replace(
+        "id-irontrail-abc123",
+        "other-identity",
+    )
+
+    result = validate(payload(change("Unsupported", resource_id)))
+
+    assert len(result) == 1
+    assert "not approved" in result[0]

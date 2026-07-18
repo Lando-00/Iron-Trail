@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -48,6 +49,59 @@ def resource_type(resource_id: str) -> str:
     return "/".join([provider_parts[0], *provider_parts[1::2]]).lower()
 
 
+def allowed_roles_for_parent(parent: str, foundry_id: str) -> set[str] | None:
+    if parent == foundry_id:
+        return {ROLE_IDS["foundry_user"]}
+    if "/providers/microsoft.containerregistry/registries/crirontrail" in parent:
+        return {ROLE_IDS["acr_pull"]}
+    if "/providers/microsoft.storage/storageaccounts/stirontrail" in parent:
+        return {
+            ROLE_IDS["blob_contributor"],
+            ROLE_IDS["table_contributor"],
+        }
+    if "/providers/microsoft.keyvault/vaults/kv-irontrail-" in parent:
+        return {ROLE_IDS["key_vault_secrets_user"]}
+    return None
+
+
+def validate_symbolic_role_assignment(
+    resource_id: str,
+    *,
+    subscription_id: str,
+    resource_group: str,
+    foundry_id: str,
+) -> list[str]:
+    lowered = resource_id.lower()
+    scope_match = re.search(r"extensionresourceid\('([^']+)'", lowered)
+    role_matches = re.findall(r"/roledefinitions/([0-9a-f-]{36})", lowered)
+    identity_match = re.search(
+        r"reference\('([^']+/providers/microsoft\.managedidentity/"
+        r"userassignedidentities/id-irontrail-[^']+)'",
+        lowered,
+    )
+    if (
+        not scope_match
+        or len(role_matches) != 1
+        or not identity_match
+        or "'microsoft.authorization/roleassignments'" not in lowered
+    ):
+        return [f"Unsupported resource expression is not approved: {resource_id}."]
+
+    parent = scope_match.group(1).rstrip("/")
+    expected_identity_prefix = (
+        f"/subscriptions/{subscription_id}/resourcegroups/{resource_group}/providers/"
+        "microsoft.managedidentity/userassignedidentities/id-irontrail-"
+    ).lower()
+    if not identity_match.group(1).startswith(expected_identity_prefix):
+        return [f"Role assignment identity is not approved: {resource_id}."]
+    allowed_roles = allowed_roles_for_parent(parent, foundry_id)
+    if allowed_roles is None:
+        return [f"Role assignment scope is not approved: {resource_id}."]
+    if role_matches[0] not in allowed_roles:
+        return [f"Role definition is not approved: {resource_id}."]
+    return []
+
+
 def validate_whatif(
     payload: dict[str, Any],
     *,
@@ -82,6 +136,16 @@ def validate_whatif(
         lowered_id = resource_id.lower()
         if change_type in {"nochange", "ignore"}:
             continue
+        if change_type == "unsupported":
+            issues.extend(
+                validate_symbolic_role_assignment(
+                    resource_id,
+                    subscription_id=subscription_id,
+                    resource_group=resource_group,
+                    foundry_id=foundry_id,
+                )
+            )
+            continue
         if change_type != "create":
             issues.append(f"{change_type or 'unknown'} is forbidden for {resource_id}.")
             continue
@@ -96,18 +160,8 @@ def validate_whatif(
         if kind == "microsoft.authorization/roleassignments":
             role_marker = "/providers/microsoft.authorization/roleassignments/"
             parent = lowered_id.split(role_marker, 1)[0]
-            if parent == foundry_id:
-                allowed_roles = {ROLE_IDS["foundry_user"]}
-            elif "/providers/microsoft.containerregistry/registries/crirontrail" in parent:
-                allowed_roles = {ROLE_IDS["acr_pull"]}
-            elif "/providers/microsoft.storage/storageaccounts/stirontrail" in parent:
-                allowed_roles = {
-                    ROLE_IDS["blob_contributor"],
-                    ROLE_IDS["table_contributor"],
-                }
-            elif "/providers/microsoft.keyvault/vaults/kv-irontrail-" in parent:
-                allowed_roles = {ROLE_IDS["key_vault_secrets_user"]}
-            else:
+            allowed_roles = allowed_roles_for_parent(parent, foundry_id)
+            if allowed_roles is None:
                 issues.append(f"Role assignment scope is not approved: {resource_id}.")
                 continue
 

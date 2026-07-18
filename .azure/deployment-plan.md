@@ -1,6 +1,6 @@
 # IronTrail Azure Deployment Plan
 
-> **Status:** Ready for Validation
+> **Status:** Validated
 
 Generated: 2026-07-11  
 Last verified: 2026-07-18
@@ -833,17 +833,17 @@ Autopilot must stop before:
   Foundry minimal reasoning/zero retries, and owner-only settings.
 - [x] Create the dedicated assigned Entra app and private bootstrap material.
 - [x] Configure the private AZD `beta` environment.
-- [ ] Enforce the deployment preview allowlist.
+- [x] Enforce the deployment preview allowlist.
 - [x] Update this status to `Ready for Validation`.
-- [ ] Invoke `azure-validate` for the complete architecture.
-- [ ] Verify local and containerized application behavior.
+- [x] Invoke `azure-validate` for the complete architecture.
+- [x] Verify local and containerized application behavior.
 - [ ] Deploy fail-closed with Microsoft owner login; Google remains deferred.
 - [ ] Complete and verify the owner bootstrap checkpoint.
 - [ ] Keep automated two-identity isolation tests; defer live cross-user testing
   to Stage C2 before testers.
 - [ ] Verify opt-in persistence and 30/60-day expiry configuration.
 - [ ] Verify AI quotas, global disable behavior, and no Copilot credentials.
-- [ ] Record validation proof and set status to `Validated`.
+- [x] Record validation proof and set status to `Validated`.
 
 - [ ] Invoke `azure-deploy`.
 - [ ] Smoke-test the Azure-provided URL.
@@ -876,11 +876,20 @@ to `Validated`.
 | Synthetic proof | Private resumable ledger | Stopped on accepted empty completion at call 1; no replay | 2026-07-15 |
 | Azure Monitor call evidence | `AzureOpenAIRequests`, `InputTokens`, `OutputTokens` | HTTP 200; 1 request; 58 input; 300 output | 2026-07-15 |
 | Foundry billing attribution | Authenticated Cost Management query filtered to `rg-IronTrail` | EUR 0.000585690382 on `irontrail-resource` | 2026-07-18 |
-| Stage C preparation tests | `ruff check .`; `python -m pytest -q` | 66 passed | 2026-07-18 |
+| Stage C final tests | `ruff check .`; `python -m pytest -q` | 68 passed | 2026-07-18 |
 | Stage C Bicep | `az bicep build --file infra/main.bicep --stdout` | Pass | 2026-07-18 |
 | Stage C production image | Docker build; root + `/_stcore/health`; UID/package inspection | HTTP 200; UID 10001; no Copilot SDK | 2026-07-18 |
 | Stage C Entra app | Single tenant, assignment required, owner assigned, no Graph permissions | Pass; redirect intentionally absent | 2026-07-18 |
 | AZD environment | Private `beta` values and secret-presence checks | Target/location/owner/authReady verified | 2026-07-18 |
+| AZD auth/schema | `azd auth login --check-status`; `azd show --output json --no-prompt` | Pass | 2026-07-18 |
+| AZD provision preview | `azd provision --preview --no-prompt` | Only approved web resources create; Foundry/RG skipped | 2026-07-18 |
+| Subscription what-if | `az deployment sub what-if --no-pretty-print`; Stage C allowlist | Pass, including five exact symbolic UAMI roles | 2026-07-18 |
+| Subscription template validation | `az deployment sub validate` | Succeeded | 2026-07-18 |
+| AZD package | `azd package --no-prompt` | Pass | 2026-07-18 |
+| Policy/provider/quota | Policy assignments, provider registration, North Europe Container Apps quota | Pass; West Europe-only restriction irrelevant; 20 environments available | 2026-07-18 |
+| Static RBAC | UAMI role mapping for ACR, Blob, Table, Key Vault, Foundry | Five approved roles, one principal reference | 2026-07-18 |
+| Privacy/secret boundary | Tracked-file scan, raw/processed inventory, ignored private AZD environment | No secret matches; only `.gitkeep` data tracked | 2026-07-18 |
+| Predeployment baseline | Resources, RBAC, policy, provider, cost, Foundry deployment/quota | Two existing Foundry resources; one model; quota 10/300 | 2026-07-18 |
 
 ---
 
@@ -918,7 +927,7 @@ to `Validated`.
 
 ## 16. Next Step
 
-Invoke `azure-validate`. Run the provision preview, machine-enforced what-if,
-policy/quota/RBAC/package/leak checks, and baseline capture. Only a fully
-`Validated` plan may proceed through `azure-deploy`. Google and testers remain
-deferred.
+Invoke `azure-deploy` for the validated owner-only `beta` environment.
+Provision and deploy fail-closed with `Return401`, record `WEB_URL`, then
+configure the exact Entra callback and apply the narrow `authReady=true`
+update. Google and testers remain deferred.
