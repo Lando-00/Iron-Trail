@@ -103,6 +103,8 @@ class AzureAuthRepository(AuthRepository):
             try:
                 existing = self.get_user(identity.user_id)
                 if existing is not None:
+                    if not existing.is_active:
+                        raise InvitationError("Access for this identity is suspended.")
                     return existing
 
                 state = self._get_or_create_state()
@@ -200,7 +202,11 @@ class AzureAuthRepository(AuthRepository):
         for _ in range(5):
             try:
                 stored_actor = self.get_user(actor.user_id)
-                if stored_actor is None or not stored_actor.is_admin:
+                if (
+                    stored_actor is None
+                    or not stored_actor.is_admin
+                    or not stored_actor.is_active
+                ):
                     raise InvitationError("Only the beta administrator can issue invites.")
 
                 state = self._get_or_create_state()
@@ -261,6 +267,156 @@ class AzureAuthRepository(AuthRepository):
 
         raise InvitationError("Invite creation conflicted with another request. Try again.")
 
+    def list_users(self, actor: User) -> list[User]:
+        from azure.core.exceptions import AzureError
+
+        self._require_admin(actor)
+        try:
+            return sorted(
+                self._users(),
+                key=lambda user: (not user.is_admin, user.created_at, user.user_id),
+            )
+        except AzureError as exc:
+            raise AuthRepositoryError("The authorization store is unavailable.") from exc
+
+    def suspend_user(self, actor: User, target_user_id: str) -> User:
+        from azure.core import MatchConditions
+        from azure.core.exceptions import AzureError, ResourceNotFoundError
+        from azure.data.tables import TableTransactionError, UpdateMode
+
+        for _ in range(5):
+            try:
+                self._require_admin(actor)
+                try:
+                    target_entity = self._table.get_entity(
+                        _AUTH_PARTITION,
+                        f"user:{target_user_id}",
+                    )
+                except ResourceNotFoundError as exc:
+                    raise InvitationError("That beta member no longer exists.") from exc
+                target = _entity_to_user(target_entity)
+                if target.is_admin:
+                    raise InvitationError("The beta administrator cannot be suspended.")
+                if not target.is_active:
+                    return target
+
+                state = self._get_or_create_state()
+                target_update = dict(target_entity)
+                target_update["status"] = "suspended"
+                state_update = dict(state)
+                state_update["userCount"] = max(0, int(state.get("userCount", 0)) - 1)
+                self._table.submit_transaction(
+                    [
+                        (
+                            "update",
+                            target_update,
+                            {
+                                "etag": _entity_etag(target_entity),
+                                "match_condition": MatchConditions.IfNotModified,
+                                "mode": UpdateMode.REPLACE,
+                            },
+                        ),
+                        (
+                            "update",
+                            state_update,
+                            {
+                                "etag": _entity_etag(state),
+                                "match_condition": MatchConditions.IfNotModified,
+                                "mode": UpdateMode.REPLACE,
+                            },
+                        ),
+                    ]
+                )
+                return _entity_to_user(target_update)
+            except TableTransactionError as exc:
+                if getattr(exc, "status_code", None) not in {409, 412}:
+                    raise AuthRepositoryError(
+                        "The authorization store is unavailable."
+                    ) from exc
+            except InvitationError:
+                raise
+            except AzureError as exc:
+                if getattr(exc, "status_code", None) not in {409, 412}:
+                    raise AuthRepositoryError(
+                        "The authorization store is unavailable."
+                    ) from exc
+        raise InvitationError("Access suspension conflicted with another request. Try again.")
+
+    def restore_user(self, actor: User, target_user_id: str, *, max_users: int) -> User:
+        from azure.core import MatchConditions
+        from azure.core.exceptions import AzureError, ResourceNotFoundError
+        from azure.data.tables import TableTransactionError, UpdateMode
+
+        for _ in range(5):
+            try:
+                self._require_admin(actor)
+                try:
+                    target_entity = self._table.get_entity(
+                        _AUTH_PARTITION,
+                        f"user:{target_user_id}",
+                    )
+                except ResourceNotFoundError as exc:
+                    raise InvitationError("That beta member no longer exists.") from exc
+                target = _entity_to_user(target_entity)
+                if target.is_active:
+                    return target
+
+                state = self._get_or_create_state()
+                active_invites = len(self._active_invites())
+                if int(state.get("activeInviteCount", 0)) != active_invites:
+                    reconciled = dict(state)
+                    reconciled["activeInviteCount"] = active_invites
+                    self._table.update_entity(
+                        reconciled,
+                        mode=UpdateMode.REPLACE,
+                        etag=_entity_etag(state),
+                        match_condition=MatchConditions.IfNotModified,
+                    )
+                    continue
+                if int(state.get("userCount", 0)) + active_invites >= max_users:
+                    raise InvitationError("No beta place is available to restore this member.")
+
+                target_update = dict(target_entity)
+                target_update["status"] = "active"
+                state_update = dict(state)
+                state_update["userCount"] = int(state.get("userCount", 0)) + 1
+                self._table.submit_transaction(
+                    [
+                        (
+                            "update",
+                            target_update,
+                            {
+                                "etag": _entity_etag(target_entity),
+                                "match_condition": MatchConditions.IfNotModified,
+                                "mode": UpdateMode.REPLACE,
+                            },
+                        ),
+                        (
+                            "update",
+                            state_update,
+                            {
+                                "etag": _entity_etag(state),
+                                "match_condition": MatchConditions.IfNotModified,
+                                "mode": UpdateMode.REPLACE,
+                            },
+                        ),
+                    ]
+                )
+                return _entity_to_user(target_update)
+            except TableTransactionError as exc:
+                if getattr(exc, "status_code", None) not in {409, 412}:
+                    raise AuthRepositoryError(
+                        "The authorization store is unavailable."
+                    ) from exc
+            except InvitationError:
+                raise
+            except AzureError as exc:
+                if getattr(exc, "status_code", None) not in {409, 412}:
+                    raise AuthRepositoryError(
+                        "The authorization store is unavailable."
+                    ) from exc
+        raise InvitationError("Access restoration conflicted with another request. Try again.")
+
     def _get_or_create_state(self) -> Any:
         from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
 
@@ -273,7 +429,7 @@ class AzureAuthRepository(AuthRepository):
                 "RowKey": _AUTH_STATE_ROW,
                 "activeInviteCount": len(self._active_invites()),
                 "bootstrapClaimed": any(user.is_admin for user in users),
-                "userCount": len(users),
+                "userCount": sum(1 for user in users if user.is_active),
             }
             try:
                 self._table.create_entity(state)
@@ -297,6 +453,12 @@ class AzureAuthRepository(AuthRepository):
             for entity in entities
             if not entity.get("usedBy") and _as_utc(entity["expiresAt"]) > now
         ]
+
+    def _require_admin(self, actor: User) -> User:
+        stored_actor = self.get_user(actor.user_id)
+        if stored_actor is None or not stored_actor.is_admin or not stored_actor.is_active:
+            raise InvitationError("Only the beta administrator can manage access.")
+        return stored_actor
 
 
 class AzureDatasetRepository:
@@ -647,6 +809,7 @@ def _user_to_entity(user: User) -> dict[str, Any]:
         "principalId": user.principal_id,
         "displayName": user.display_name,
         "role": user.role,
+        "status": user.status,
         "createdAt": user.created_at,
     }
 
@@ -659,6 +822,7 @@ def _entity_to_user(entity: Any) -> User:
         display_name=str(entity.get("displayName") or "IronTrail user"),
         role=str(entity["role"]),
         created_at=_as_utc(entity["createdAt"]),
+        status=str(entity.get("status") or "active"),
     )
 
 

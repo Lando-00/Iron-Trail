@@ -26,11 +26,26 @@
     "bootstrapInviteHash": {
       "value": "${IRONTRAIL_BOOTSTRAP_INVITE_HASH}"
     },
+    "betaRevealSeed": {
+      "value": "${IRONTRAIL_BETA_REVEAL_SEED}"
+    },
     "ownerObjectId": {
       "value": "${IRONTRAIL_OWNER_OBJECT_ID}"
     },
     "authReady": {
       "value": "${IRONTRAIL_AUTH_READY}"
+    },
+    "googleAuthEnabled": {
+      "value": "${IRONTRAIL_GOOGLE_AUTH_ENABLED}"
+    },
+    "googleClientId": {
+      "value": "${IRONTRAIL_GOOGLE_CLIENT_ID}"
+    },
+    "googleClientSecret": {
+      "value": "${IRONTRAIL_GOOGLE_CLIENT_SECRET}"
+    },
+    "maxUsers": {
+      "value": "${IRONTRAIL_MAX_USERS}"
     },
     "monthlyBudgetEur": {
       "value": 25

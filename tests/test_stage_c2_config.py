@@ -1,0 +1,51 @@
+from __future__ import annotations
+
+import pytest
+
+from scripts.validate_stage_c2_config import validate_config
+
+
+def _base() -> dict[str, str]:
+    return {
+        "IRONTRAIL_BETA_REVEAL_SEED": "private-seed-long-enough",
+        "IRONTRAIL_GOOGLE_AUTH_ENABLED": "false",
+        "IRONTRAIL_GOOGLE_CLIENT_ID": "",
+        "IRONTRAIL_GOOGLE_CLIENT_SECRET": "",
+        "IRONTRAIL_MAX_USERS": "1",
+    }
+
+
+def test_google_disabled_does_not_require_unused_credentials() -> None:
+    validate_config(_base())
+
+
+def test_google_enabled_requires_complete_web_client_credentials() -> None:
+    config = _base()
+    config["IRONTRAIL_GOOGLE_AUTH_ENABLED"] = "true"
+
+    with pytest.raises(ValueError, match="client ID"):
+        validate_config(config)
+
+    config["IRONTRAIL_GOOGLE_CLIENT_ID"] = "client.apps.googleusercontent.com"
+    with pytest.raises(ValueError, match="CLIENT_SECRET"):
+        validate_config(config)
+
+    config["IRONTRAIL_GOOGLE_CLIENT_SECRET"] = "private-client-secret"
+    validate_config(config)
+
+
+@pytest.mark.parametrize("max_users", ["", "0", "6", "five"])
+def test_user_ceiling_is_limited_to_five(max_users: str) -> None:
+    config = _base()
+    config["IRONTRAIL_MAX_USERS"] = max_users
+
+    with pytest.raises(ValueError, match="from 1 to 5"):
+        validate_config(config)
+
+
+def test_reveal_seed_is_required_for_full_provision() -> None:
+    config = _base()
+    config["IRONTRAIL_BETA_REVEAL_SEED"] = "short"
+
+    with pytest.raises(ValueError, match="at least 16"):
+        validate_config(config)

@@ -23,6 +23,11 @@ param aadClientSecret string
 @description('SHA-256 hash of the bootstrap administrator invite.')
 param bootstrapInviteHash string
 
+@secure()
+@minLength(16)
+@description('Private seed for the anonymous beta landing reveal sequence.')
+param betaRevealSeed string
+
 @description('Immutable Entra object ID allowed to redeem the bootstrap administrator invite.')
 param ownerObjectId string
 
@@ -32,6 +37,31 @@ param ownerObjectId string
 ])
 @description('Whether the verified login landing page may accept anonymous requests.')
 param authReady string
+
+@allowed([
+  'false'
+  'true'
+])
+@description('Whether Google is configured as an Easy Auth identity provider.')
+param googleAuthEnabled string
+
+@description('Google OAuth web client ID.')
+@minLength(1)
+param googleClientId string
+
+@secure()
+@description('Google OAuth web client secret.')
+param googleClientSecret string
+
+@allowed([
+  '1'
+  '2'
+  '3'
+  '4'
+  '5'
+])
+@description('Maximum number of active beta members, including the owner.')
+param maxUsers string
 
 var resourceSuffix = take(uniqueString(subscription().id, resourceGroup().id, environmentName), 6)
 var tags = {
@@ -55,6 +85,8 @@ var placeholderImage = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:lat
 var unauthenticatedClientAction = toLower(authReady) == 'true' ? 'AllowAnonymous' : 'Return401'
 var tableEndpoint = 'https://${storageAccountName}.table.${environment().suffixes.storage}'
 var foundryEndpoint = 'https://${foundryAccountName}.cognitiveservices.azure.com/'
+var googleAuthConfigured = toLower(googleAuthEnabled) == 'true'
+var authProviders = googleAuthConfigured ? 'aad,google' : 'aad'
 
 var acrPullRoleId = '7f951dda-4ed3-4680-a7ca-43fe172d538d'
 var storageBlobContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
@@ -238,7 +270,7 @@ module keyVault 'br/public:avm/res/key-vault/vault:0.13.3' = {
         roleDefinitionIdOrName: keyVaultSecretsUserRoleId
       }
     ]
-    secrets: [
+    secrets: concat([
       {
         contentType: 'Container Apps Easy Auth client secret'
         name: 'aad-client-secret'
@@ -254,7 +286,18 @@ module keyVault 'br/public:avm/res/key-vault/vault:0.13.3' = {
         name: 'appinsights-connection-string'
         value: applicationInsights.outputs.connectionString
       }
-    ]
+      {
+        contentType: 'Private beta landing reveal seed'
+        name: 'beta-reveal-seed'
+        value: betaRevealSeed
+      }
+    ], googleAuthConfigured ? [
+      {
+        contentType: 'Google OAuth web client secret'
+        name: 'google-client-secret'
+        value: googleClientSecret
+      }
+    ] : [])
     sku: 'standard'
     softDeleteRetentionInDays: 7
     tags: tags
@@ -305,7 +348,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.23.0' = {
       httpSettings: {
         requireHttps: true
       }
-      identityProviders: {
+      identityProviders: union({
         azureActiveDirectory: {
           enabled: true
           registration: {
@@ -314,7 +357,27 @@ module containerApp 'br/public:avm/res/app/container-app:0.23.0' = {
             openIdIssuer: '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
           }
         }
-      }
+      }, googleAuthConfigured ? {
+        google: {
+          enabled: true
+          login: {
+            scopes: [
+              'openid'
+              'email'
+              'profile'
+            ]
+          }
+          registration: {
+            clientId: googleClientId
+            clientSecretSettingName: 'google-client-secret'
+          }
+          validation: {
+            allowedAudiences: [
+              googleClientId
+            ]
+          }
+        }
+      } : {})
       platform: {
         enabled: true
       }
@@ -332,11 +395,15 @@ module containerApp 'br/public:avm/res/app/container-app:0.23.0' = {
           }
           {
             name: 'IRONTRAIL_AUTH_PROVIDERS'
-            value: 'aad'
+            value: authProviders
           }
           {
             name: 'IRONTRAIL_MAX_USERS'
-            value: '1'
+            value: maxUsers
+          }
+          {
+            name: 'IRONTRAIL_AUTH_REVALIDATE_SECONDS'
+            value: '5'
           }
           {
             name: 'IRONTRAIL_OWNER_OBJECT_ID'
@@ -369,6 +436,10 @@ module containerApp 'br/public:avm/res/app/container-app:0.23.0' = {
           {
             name: 'IRONTRAIL_BOOTSTRAP_INVITE_HASH'
             secretRef: 'bootstrap-invite-hash'
+          }
+          {
+            name: 'IRONTRAIL_BETA_REVEAL_SEED'
+            secretRef: 'beta-reveal-seed'
           }
           {
             name: 'IRONTRAIL_DATA_CONTAINER'
@@ -438,7 +509,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.23.0' = {
       maxReplicas: 1
       minReplicas: 0
     }
-    secrets: [
+    secrets: concat([
       {
         identity: managedIdentity.outputs.resourceId
         keyVaultUrl: '${keyVault.outputs.uri}secrets/aad-client-secret'
@@ -454,7 +525,18 @@ module containerApp 'br/public:avm/res/app/container-app:0.23.0' = {
         keyVaultUrl: '${keyVault.outputs.uri}secrets/appinsights-connection-string'
         name: 'appinsights-connection-string'
       }
-    ]
+      {
+        identity: managedIdentity.outputs.resourceId
+        keyVaultUrl: '${keyVault.outputs.uri}secrets/beta-reveal-seed'
+        name: 'beta-reveal-seed'
+      }
+    ], googleAuthConfigured ? [
+      {
+        identity: managedIdentity.outputs.resourceId
+        keyVaultUrl: '${keyVault.outputs.uri}secrets/google-client-secret'
+        name: 'google-client-secret'
+      }
+    ] : [])
     stickySessionsAffinity: 'sticky'
     tags: serviceTags
   }

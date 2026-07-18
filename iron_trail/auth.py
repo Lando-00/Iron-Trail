@@ -9,7 +9,7 @@ import secrets
 import threading
 import uuid
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
 
@@ -19,6 +19,8 @@ from . import beta_landing, runtime
 
 _USER_NAMESPACE = uuid.UUID("25b64e27-4acd-4e23-8b94-2a0657200fb4")
 _AUTH_PARTITION = "auth"
+_USER_STATUS_ACTIVE = "active"
+_USER_STATUS_SUSPENDED = "suspended"
 _SENSITIVE_SESSION_KEYS = {
     "csv_upload_widget",
     "it_current_user",
@@ -66,10 +68,15 @@ class User:
     display_name: str
     role: str
     created_at: datetime
+    status: str = _USER_STATUS_ACTIVE
 
     @property
     def is_admin(self) -> bool:
         return self.role == "admin"
+
+    @property
+    def is_active(self) -> bool:
+        return self.status == _USER_STATUS_ACTIVE
 
 
 @dataclass
@@ -98,6 +105,12 @@ class AuthRepository(Protocol):
     ) -> User: ...
 
     def issue_invite(self, actor: User, *, ttl: timedelta, max_users: int) -> str: ...
+
+    def list_users(self, actor: User) -> list[User]: ...
+
+    def suspend_user(self, actor: User, target_user_id: str) -> User: ...
+
+    def restore_user(self, actor: User, target_user_id: str, *, max_users: int) -> User: ...
 
 
 def hash_invite_code(code: str) -> str:
@@ -136,6 +149,16 @@ def identity_from_headers(headers: Mapping[str, str]) -> Identity | None:
         )
         if object_id:
             principal_id = object_id
+    elif provider == "google":
+        subject = _first_claim(
+            claims,
+            (
+                "sub",
+                "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier",
+            ),
+        )
+        if subject:
+            principal_id = subject
     if not principal_id:
         principal_id = _first_claim(
             claims,
@@ -230,6 +253,7 @@ def require_invited_user(repository: AuthRepository | None = None) -> User:
     if (
         isinstance(cached, User)
         and cached.user_id == identity.user_id
+        and cached.is_active
         and isinstance(checked_at, datetime)
         and now - checked_at < revalidate_after
     ):
@@ -240,10 +264,14 @@ def require_invited_user(repository: AuthRepository | None = None) -> User:
     except AuthRepositoryError:
         st.error("IronTrail could not verify access right now. Please retry shortly.")
         st.stop()
-    if user is not None:
+    if user is not None and user.is_active:
         st.session_state["it_current_user"] = user
         st.session_state["it_current_user_checked_at"] = now
         return user
+    if user is not None:
+        clear_sensitive_session_state()
+        _render_suspended_gate()
+        st.stop()
 
     clear_sensitive_session_state()
     _render_invite_gate(identity, repo)
@@ -261,6 +289,8 @@ def render_account_controls(user: User, repository: AuthRepository | None = None
         return
 
     max_users = runtime.env_int("IRONTRAIL_MAX_USERS", 5, minimum=1)
+    repo = repository or get_auth_repository()
+    _render_member_management(user, repo, max_users=max_users)
     if max_users == 1:
         st.caption("Owner-only beta; tester invitations are disabled.")
         return
@@ -268,7 +298,6 @@ def render_account_controls(user: User, repository: AuthRepository | None = None
     with st.expander("Invite a tester"):
         st.caption("Codes are single-use, expire automatically, and are shown only once.")
         if st.button("Generate invite code", key="generate_invite_code", use_container_width=True):
-            repo = repository or get_auth_repository()
             try:
                 code = repo.issue_invite(
                     user,
@@ -318,8 +347,11 @@ class InMemoryAuthRepository:
         with self._lock:
             existing = self.users.get(identity.user_id)
             if existing is not None:
+                if not existing.is_active:
+                    raise InvitationError("Access for this identity is suspended.")
                 return existing
-            if len(self.users) >= max_users:
+            active_users = sum(1 for user in self.users.values() if user.is_active)
+            if active_users >= max_users:
                 raise InvitationError("The private beta is full.")
 
             code_hash = hash_invite_code(code)
@@ -345,10 +377,12 @@ class InMemoryAuthRepository:
 
     def issue_invite(self, actor: User, *, ttl: timedelta, max_users: int) -> str:
         with self._lock:
-            if not actor.is_admin or actor.user_id not in self.users:
+            stored_actor = self.users.get(actor.user_id)
+            if stored_actor is None or not stored_actor.is_admin or not stored_actor.is_active:
                 raise InvitationError("Only the beta administrator can issue invites.")
-            active = sum(1 for invite in self.invites.values() if invite.is_active)
-            if len(self.users) + active >= max_users:
+            active_invites = sum(1 for invite in self.invites.values() if invite.is_active)
+            active_users = sum(1 for user in self.users.values() if user.is_active)
+            if active_users + active_invites >= max_users:
                 raise InvitationError("All beta places are already assigned.")
             code = secrets.token_urlsafe(24)
             self.invites[hash_invite_code(code)] = Invite(
@@ -357,6 +391,50 @@ class InMemoryAuthRepository:
                 created_by=actor.user_id,
             )
             return code
+
+    def list_users(self, actor: User) -> list[User]:
+        with self._lock:
+            self._require_admin(actor)
+            return sorted(
+                self.users.values(),
+                key=lambda user: (not user.is_admin, user.created_at, user.user_id),
+            )
+
+    def suspend_user(self, actor: User, target_user_id: str) -> User:
+        with self._lock:
+            self._require_admin(actor)
+            target = self.users.get(target_user_id)
+            if target is None:
+                raise InvitationError("That beta member no longer exists.")
+            if target.is_admin:
+                raise InvitationError("The beta administrator cannot be suspended.")
+            if not target.is_active:
+                return target
+            updated = replace(target, status=_USER_STATUS_SUSPENDED)
+            self.users[target_user_id] = updated
+            return updated
+
+    def restore_user(self, actor: User, target_user_id: str, *, max_users: int) -> User:
+        with self._lock:
+            self._require_admin(actor)
+            target = self.users.get(target_user_id)
+            if target is None:
+                raise InvitationError("That beta member no longer exists.")
+            if target.is_active:
+                return target
+            active_invites = sum(1 for invite in self.invites.values() if invite.is_active)
+            active_users = sum(1 for user in self.users.values() if user.is_active)
+            if active_users + active_invites >= max_users:
+                raise InvitationError("No beta place is available to restore this member.")
+            updated = replace(target, status=_USER_STATUS_ACTIVE)
+            self.users[target_user_id] = updated
+            return updated
+
+    def _require_admin(self, actor: User) -> User:
+        stored_actor = self.users.get(actor.user_id)
+        if stored_actor is None or not stored_actor.is_admin or not stored_actor.is_active:
+            raise InvitationError("Only the beta administrator can manage access.")
+        return stored_actor
 
 
 def _is_bootstrap_owner(identity: Identity, bootstrap_owner_id: str) -> bool:
@@ -391,6 +469,68 @@ def _render_invite_gate(identity: Identity, repository: AuthRepository) -> None:
             st.session_state["it_current_user_checked_at"] = datetime.now(UTC)
             st.rerun()
     st.markdown("[Sign out](/.auth/logout?post_logout_redirect_uri=/)")
+
+
+def _render_suspended_gate() -> None:
+    st.error("Access for this identity is suspended.")
+    st.markdown("[Sign out](/.auth/logout?post_logout_redirect_uri=/)")
+
+
+def _render_member_management(
+    actor: User,
+    repository: AuthRepository,
+    *,
+    max_users: int,
+) -> None:
+    with st.expander("Manage beta access"):
+        try:
+            members = repository.list_users(actor)
+        except (InvitationError, AuthRepositoryError) as exc:
+            st.error(str(exc))
+            return
+
+        active_count = sum(1 for member in members if member.is_active)
+        st.caption(f"{active_count} of {max_users} active beta places assigned.")
+        for member in members:
+            provider = "Microsoft" if member.provider == "aad" else member.provider.title()
+            status = "active" if member.is_active else "suspended"
+            st.text(f"{member.display_name} · {provider} · {member.role} · {status}")
+            if member.is_admin:
+                st.caption("The beta administrator cannot be suspended.")
+                continue
+
+            if member.is_active:
+                confirmed = st.checkbox(
+                    f"Confirm suspension for {member.display_name}",
+                    key=f"suspend_member_confirm_{member.user_id}",
+                )
+                if st.button(
+                    "Suspend access",
+                    key=f"suspend_member_{member.user_id}",
+                    disabled=not confirmed,
+                    use_container_width=True,
+                ):
+                    try:
+                        repository.suspend_user(actor, member.user_id)
+                    except (InvitationError, AuthRepositoryError) as exc:
+                        st.error(str(exc))
+                    else:
+                        st.session_state.pop(
+                            f"suspend_member_confirm_{member.user_id}",
+                            None,
+                        )
+                        st.rerun()
+            elif st.button(
+                "Restore access",
+                key=f"restore_member_{member.user_id}",
+                use_container_width=True,
+            ):
+                try:
+                    repository.restore_user(actor, member.user_id, max_users=max_users)
+                except (InvitationError, AuthRepositoryError) as exc:
+                    st.error(str(exc))
+                else:
+                    st.rerun()
 
 
 def _user_from_identity(identity: Identity, role: str) -> User:

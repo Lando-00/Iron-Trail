@@ -26,6 +26,11 @@ param aadClientSecret string
 @description('SHA-256 hash of the first administrator invite code.')
 param bootstrapInviteHash string
 
+@secure()
+@minLength(16)
+@description('Private seed for the anonymous beta landing reveal sequence.')
+param betaRevealSeed string
+
 @description('Immutable Entra object ID allowed to redeem the bootstrap administrator invite.')
 param ownerObjectId string
 
@@ -35,6 +40,31 @@ param ownerObjectId string
 ])
 @description('Whether the verified login landing page may accept anonymous requests.')
 param authReady string = 'false'
+
+@allowed([
+  'false'
+  'true'
+])
+@description('Whether Google is configured as an Easy Auth identity provider.')
+param googleAuthEnabled string = 'false'
+
+@description('Google OAuth web client ID.')
+@minLength(1)
+param googleClientId string = 'disabled'
+
+@secure()
+@description('Google OAuth web client secret.')
+param googleClientSecret string = ''
+
+@allowed([
+  '1'
+  '2'
+  '3'
+  '4'
+  '5'
+])
+@description('Maximum number of active beta members, including the owner.')
+param maxUsers string = '1'
 
 @description('Monthly Azure budget in EUR for this resource group.')
 param monthlyBudgetEur int = 25
@@ -50,10 +80,15 @@ module application './modules/application.bicep' = {
     aadClientId: aadClientId
     aadClientSecret: aadClientSecret
     authReady: authReady
+    betaRevealSeed: betaRevealSeed
     bootstrapInviteHash: bootstrapInviteHash
     environmentName: environmentName
     foundryAccountName: foundryAccountName
+    googleAuthEnabled: googleAuthEnabled
+    googleClientId: googleClientId
+    googleClientSecret: googleClientSecret
     location: location
+    maxUsers: maxUsers
     modelDeploymentName: modelDeploymentName
     ownerObjectId: ownerObjectId
   }

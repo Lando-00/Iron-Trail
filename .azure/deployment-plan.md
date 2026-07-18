@@ -1,6 +1,6 @@
 # IronTrail Azure Deployment Plan
 
-> **Status:** Deployed
+> **Status:** Preparing Stage C2
 
 Generated: 2026-07-11  
 Last verified: 2026-07-18
@@ -696,6 +696,88 @@ Use only bundled/synthetic data to verify:
 
 ---
 
+## 9A. Stage C2 Google OAuth and Tester-Access Plan
+
+### Approved decisions
+
+| Area | Stage C2 decision |
+|---|---|
+| Scope | Configure Google, enroll one retained canary, prove two-user isolation, then enable controlled tester-code generation |
+| Google project | New dedicated `IronTrail Beta` project |
+| Google audience | External, Testing mode, named canary test user |
+| OAuth scopes | `openid`, `email`, `profile` only |
+| Providers | Microsoft and Google |
+| Identity binding | AAD object ID and Google OpenID Connect `sub`; no account linking |
+| User rollout | 1 owner -> 2 users for canary -> 5 total after acceptance |
+| Access management | Owner-only reversible member suspension/restoration before codes are enabled |
+| Canary | Retain as the first member |
+| Final invite state | Generator visible, zero unused codes, no external tester invited |
+| Release boundary | Push `feature/azure-hosting`; do not merge |
+
+Google Testing mode and the anonymous landing puzzle are not authorization.
+Easy Auth proves the external identity; IronTrail's active member record and
+single-use invite remain the application boundary.
+
+### Preparation
+
+1. Prefer Google's immutable `sub` claim over mutable email/principal headers.
+2. Add backward-compatible active/suspended member status, repository-enforced
+   admin operations, capacity-safe restore logic, and owner controls.
+3. Add conditional Google Easy Auth configuration with the exact Google client
+   ID, secret reference, scopes, and allowed audience.
+4. Promote the private landing reveal seed into Key Vault-backed IaC before a
+   full provision.
+5. Parameterize `IRONTRAIL_MAX_USERS` for the staged 1 -> 2 -> 5 rollout and
+   revalidate membership every five seconds.
+6. Preserve AAD, the custom anonymous landing, all five existing UAMI roles,
+   storage isolation, lifecycle, budget, and scale 0-1.
+
+### Google registration
+
+- Authorized JavaScript origin:
+  `https://ca-irontrail-t5padq.ambitiousbush-1b702384.northeurope.azurecontainerapps.io`
+- Authorized redirect URI:
+  `https://ca-irontrail-t5padq.ambitiousbush-1b702384.northeurope.azurecontainerapps.io/.auth/login/google/callback`
+- Store the client ID and secret only in the ignored private AZD environment
+  and Key Vault-backed Container App secret path.
+- Do not enable Google APIs, request offline access, or leave a downloaded
+  client-secret file in either repository.
+
+### Staged live acceptance
+
+1. Deploy Google with `maxUsers=1`; prove the owner still works and an unknown
+   Google identity reaches only the invite gate with no durable app records.
+2. Raise to two, generate one private 72-hour code, and enroll the Google
+   canary.
+3. With separate Microsoft and Google sessions, prove list/load/cache/export/
+   delete/session isolation using distinct synthetic sentinels.
+4. Suspend the canary, prove access denial after the bounded cache window,
+   restore it without a new invite, and prove retained data is unchanged.
+5. Clean all active synthetic data, raise to five, leave owner plus canary
+   active, leave zero unused invites, and issue no external tester code.
+
+### Failure policy
+
+- Any OAuth callback, immutable-identity, invite, suspension, isolation,
+  secret, or unexpected-resource failure blocks tester access.
+- Before enrollment, roll back to AAD-only and one user.
+- After enrollment, suspend the canary before rolling back to AAD-only and one
+  user. Preserve data and resources for diagnosis; never delete automatically.
+
+### Current preparation state
+
+- Application/IaC foundation: 100 tests pass; Ruff and Bicep are clean.
+- The existing live reveal secret cannot be read back from Container Apps.
+  A new private seed was generated that preserves the same target emoji/control
+  pair and was stored only in the ignored AZD environment.
+- Google-disabled AZD preview succeeds and applies no changes.
+- The private configuration validator passes with Google disabled and refuses
+  incomplete Google credentials when enabled.
+- Google project creation is paused at the account-level Google Cloud Platform
+  Terms screen. Legal acceptance requires the user's explicit action.
+
+---
+
 ## 10. Health Integration Roadmap
 
 ### Samsung Health
@@ -865,6 +947,22 @@ Autopilot must stop before:
 - [x] Record the final revision/image evidence, update project documentation,
   commit, and push without merging.
 
+### Stage C2: Google OAuth and controlled tester access
+
+- [x] Approve the Stage C2 design, user ceiling, canary, and access-management
+  behavior.
+- [x] Implement immutable Google identity binding and reversible member status.
+- [x] Add conditional Google/reveal-seed IaC and staged user settings.
+- [x] Pass the initial 93-test, Ruff, Bicep, and Google-disabled AZD preview
+  baseline.
+- [ ] Accept Google Cloud Platform terms and create the dedicated OAuth client.
+- [ ] Run complete `azure-validate` checks with real private Google values.
+- [ ] Deploy provider-only mode at one user and prove the unknown-user gate.
+- [ ] Enroll the retained canary at two users.
+- [ ] Complete live two-user isolation and suspend/restore acceptance.
+- [ ] Raise to five, leave zero active invites, update evidence, commit, and
+  push without merging.
+
 ---
 
 ## 13. Validation Proof
@@ -925,6 +1023,12 @@ to `Validated`.
 | Landing-page live anonymous UI | Fresh headless Chromium sessions against the Azure URL | Initial sign-in hidden; wrong sequence rejected; exact reveal succeeded; mobile 390 px; reduced motion disabled animation | 2026-07-18 |
 | Landing-page live owner auth | Existing dedicated-browser Microsoft session through Easy Auth | Assigned owner reached the dashboard and account controls | 2026-07-18 |
 | Landing-page live operations | Revision, traffic, probes, secret, image, RBAC, endpoint, and log checks | One healthy active revision at 100%; HTTP 200; seed reference preserved; five UAMI roles; zero error/privacy log markers | 2026-07-18 |
+| Stage C2 authorization foundation | x64 `ruff check .`; x64 `python -m pytest -q`; `git diff --check` | Ruff clean; 100 passed; diff clean | 2026-07-18 |
+| Stage C2 auth concurrency | Azure fake-table 409/412 retry, capacity, admin, legacy-row, suspension/restoration tests | Pass | 2026-07-18 |
+| Stage C2 dual-provider local UI | Headless Chromium with `aad,google` | Both sign-in links reveal; mobile and reduced-motion behavior remain correct | 2026-07-18 |
+| Stage C2 production image | Native Docker build; root + `/_stcore/health`; UID/package inspection | HTTP 200; UID 10001; no Copilot SDK | 2026-07-18 |
+| Stage C2 disabled-provider IaC | Bicep build; private config validator; `azd provision --preview`; `azd package` | Pass; no changes applied | 2026-07-18 |
+| Stage C2 independent review | Rubber-duck and bug-only diff review | Confirmation state, Azure parity/retries, actor revalidation, and disabled-secret validation findings resolved | 2026-07-18 |
 
 ---
 
@@ -1008,7 +1112,7 @@ requests. No retry or further model request was sent.
 
 ## 17. Next Step
 
-Keep the deployed beta owner-only and invite nobody. Require a new decision
-before any merge or public release. Google OAuth and live two-user isolation
-remain the mandatory Stage C2 gate before testers. Before any future full
-provision, promote the reveal seed into the secure Bicep/Key Vault path.
+The user must explicitly accept the Google Cloud Platform Terms displayed for
+`lovantog@gmail.com`. Then create the dedicated Google OAuth client and resume
+Stage C2 validation. Until the full canary/isolation/suspension gate passes,
+keep the deployed beta owner-only and invite nobody.
