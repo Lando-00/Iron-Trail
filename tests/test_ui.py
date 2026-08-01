@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import plotly.graph_objects as go
 import pytest
 
@@ -69,6 +71,36 @@ def test_sparkline_svg_markup_renders_safe_polyline() -> None:
     assert "<script" not in markup
     assert "0.00,28.00" in markup
     assert "100.00,16.00" in markup
+
+
+def test_css_holds_no_colour_literals() -> None:
+    """Colours live in theme.COLORS only. A literal in the stylesheet would be
+    invisible to the palette, so the two would drift apart."""
+    css = ui._CSS
+
+    assert not re.findall(r"#[0-9a-fA-F]{3,8}\b", css)
+    assert not re.findall(r"rgba?\(\s*\d", css)
+
+
+def test_every_css_variable_used_is_defined_by_the_palette() -> None:
+    declared = set(re.findall(r"--it-[a-z-]+(?=:)", theme.css_variables()))
+    # --it-chart-h is a layout token the stylesheet declares for itself.
+    declared |= set(re.findall(r"--it-[a-z-]+(?=:)", ui._CSS))
+    used = set(re.findall(r"var\((--it-[a-z-]+)", ui._CSS))
+
+    assert used, "expected the stylesheet to reference custom properties"
+    assert used <= declared, f"undefined custom properties: {sorted(used - declared)}"
+    assert "--it-accent-gold" in used
+
+
+def test_css_variables_render_hex_and_rgb_forms() -> None:
+    block = theme.css_variables()
+
+    assert block.startswith(":root {")
+    assert f"--it-accent-gold: {theme.COLORS['accent_gold']};" in block
+    # rgba(var(--it-accent-gold-rgb), 0.18) needs a bare triple, not a hex.
+    assert "--it-accent-gold-rgb: 212, 168, 67;" in block
+    assert "--it-overlay-rgb: 255, 255, 255;" in block
 
 
 def test_chart_layout_drops_the_hardcoded_height_so_css_can_drive_it() -> None:

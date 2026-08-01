@@ -20,6 +20,11 @@ COLORS = {
     # 4.85:1 on #0a0a0c — the previous #5b5b62 was 2.94:1 and failed WCAG AA
     # for body text, which showed up badly on phones in daylight.
     "text_muted": "#7d7d86",
+    "text_soft": "#b5b5b9",
+    "text_tab": "#b9b9c2",
+    # Tinted overlays (surfaces, borders, glows) are drawn in this colour at low
+    # alpha, so it is what decides whether panels sit above or below the page.
+    "overlay": "#ffffff",
     "accent_gold": "#d4a843",
     "accent_blue": "#5b9cf0",
     "accent_red": "#e85a4f",
@@ -27,7 +32,67 @@ COLORS = {
     "accent_lavender": "#9b87f5",
     "accent_peach": "#e8a05b",
     "accent_mint": "#5dc77c",
+    # Readable text on top of a 6%-alpha accent wash — the accents themselves
+    # are too saturated to read as body copy inside callouts.
+    "tint_gold": "#e6c887",
+    "tint_blue": "#a3c4f0",
+    "tint_blue_soft": "#b5cef5",
+    "tint_red": "#f4a99f",
+    "tint_green": "#a6e3b8",
 }
+
+# Emitted as `--it-<name>` custom properties so the stylesheet in ui.py holds no
+# colour literals of its own and a palette swap is a single :root rewrite.
+CSS_COLOR_KEYS = (
+    "bg",
+    "text_primary",
+    "text_secondary",
+    "text_muted",
+    "text_soft",
+    "text_tab",
+    "overlay",
+    "accent_gold",
+    "accent_blue",
+    "accent_red",
+    "accent_green",
+    "accent_lavender",
+    "accent_peach",
+    "tint_gold",
+    "tint_blue",
+    "tint_blue_soft",
+    "tint_red",
+    "tint_green",
+)
+
+# Also emitted as bare `R, G, B` triples, because these are used through
+# rgba(var(--it-x-rgb), <alpha>) for washes, borders and glows.
+CSS_RGB_KEYS = (
+    "bg",
+    "overlay",
+    "accent_gold",
+    "accent_blue",
+    "accent_red",
+    "accent_green",
+    "accent_lavender",
+)
+
+
+def _rgb_triple(hex_colour: str) -> str:
+    value = hex_colour.lstrip("#")
+    return ", ".join(str(int(value[index : index + 2], 16)) for index in (0, 2, 4))
+
+
+def css_variables(colors: dict[str, str] | None = None) -> str:
+    """Render the active palette as a `:root` block of `--it-*` properties."""
+    palette = colors if colors is not None else COLORS
+    lines = [f"    --it-{key.replace('_', '-')}: {palette[key]};" for key in CSS_COLOR_KEYS]
+    lines += [
+        f"    --it-{key.replace('_', '-')}-rgb: {_rgb_triple(palette[key])};"
+        for key in CSS_RGB_KEYS
+    ]
+    body = "\n".join(lines)
+    return f":root {{\n{body}\n}}"
+
 
 CHART_CYCLE = [
     COLORS["accent_gold"],
