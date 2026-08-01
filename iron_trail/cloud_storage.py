@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 import os
 import re
 import secrets
@@ -30,6 +31,8 @@ _AUTH_PARTITION = "auth"
 _AUTH_STATE_ROW = "state"
 _SAFE_FILENAME = re.compile(r"[^A-Za-z0-9._-]+")
 
+logger = logging.getLogger("iron_trail.cloud_storage")
+
 
 class CloudStorageError(RuntimeError):
     """Raised when private cloud storage cannot complete an operation."""
@@ -50,6 +53,38 @@ class DatasetRecord:
     raw_blob: str
     normalized_blob: str
     size_bytes: int
+
+
+def _save_single_dataset(
+    repository: Any,
+    user_id: str,
+    content: bytes,
+    filename: str,
+    dataframe: pd.DataFrame,
+) -> DatasetRecord:
+    """Persist one dataset per user, replacing any previous one.
+
+    Deliberately save-then-prune: the new dataset is written first, and only
+    then are older ones removed. A failure therefore never leaves the user
+    with no data, and a partial prune only leaves a stale record that the
+    retention sweep in ``list_datasets`` clears later.
+    """
+    record = repository.save_hevy_dataset(user_id, content, filename, dataframe)
+    try:
+        stale = [
+            existing
+            for existing in repository.list_datasets(user_id)
+            if existing.dataset_id != record.dataset_id
+        ]
+    except CloudStorageError:
+        logger.warning("Could not list datasets to prune after save", exc_info=True)
+        return record
+    for existing in stale:
+        try:
+            repository.delete_dataset(user_id, existing.dataset_id)
+        except CloudStorageError:
+            logger.warning("Could not prune superseded dataset", exc_info=True)
+    return record
 
 
 def azure_credential() -> Any:
@@ -526,6 +561,15 @@ class AzureDatasetRepository:
             raise CloudStorageError("Unable to save dataset metadata.") from exc
         return record
 
+    def save_single_dataset(
+        self,
+        user_id: str,
+        content: bytes,
+        filename: str,
+        dataframe: pd.DataFrame,
+    ) -> DatasetRecord:
+        return _save_single_dataset(self, user_id, content, filename, dataframe)
+
     def list_datasets(self, user_id: str) -> list[DatasetRecord]:
         from azure.core.exceptions import AzureError
 
@@ -683,6 +727,15 @@ class InMemoryDatasetRepository:
         self.raw[key] = content
         self.frames[key] = dataframe.copy()
         return record
+
+    def save_single_dataset(
+        self,
+        user_id: str,
+        content: bytes,
+        filename: str,
+        dataframe: pd.DataFrame,
+    ) -> DatasetRecord:
+        return _save_single_dataset(self, user_id, content, filename, dataframe)
 
     def list_datasets(self, user_id: str) -> list[DatasetRecord]:
         now = datetime.now(UTC)

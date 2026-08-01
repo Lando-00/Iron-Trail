@@ -7,6 +7,7 @@ uploaded file persists as the user navigates between pages.
 """
 from __future__ import annotations
 
+import hashlib
 import io
 from pathlib import Path
 
@@ -14,7 +15,7 @@ import pandas as pd
 import streamlit as st
 
 from . import auth, config, ingest, runtime
-from .cloud_storage import CloudStorageError, DatasetRecord, get_dataset_repository
+from .cloud_storage import CloudStorageError, get_dataset_repository
 from .uploads import UploadValidationError
 
 
@@ -161,50 +162,101 @@ def _render_cloud_data_source() -> tuple[pd.DataFrame, str, float]:
         df = _load_from_bytes(content, filename, body_weight)
         label = f"Session upload: {filename}"
 
-        persist = st.checkbox(
-            "Save privately",
-            value=False,
-            help=(
-                "Active raw data expires after 30 days and active normalized data after "
-                "60 days. Deleted blobs may remain recoverable by privileged Azure "
-                "operators for up to 7 additional days."
-            ),
-        )
-        if persist and st.button("Save this dataset", type="primary", use_container_width=True):
-            try:
-                record = repository.save_hevy_dataset(
-                    user.user_id,
-                    content,
-                    filename,
-                    df,
-                )
-            except CloudStorageError as exc:
-                st.error(str(exc))
-            else:
-                st.session_state["it_saved_upload_id"] = record.dataset_id
-                st.session_state.pop("it_data_export_bytes", None)
-                st.success("Saved privately with automatic expiry.")
-    else:
-        records = repository.list_datasets(user.user_id)
-        choices: list[DatasetRecord | None] = [None, *records]
-        selected = st.selectbox(
-            "Dataset",
-            choices,
-            format_func=lambda record: (
-                "Synthetic sample"
-                if record is None
-                else f"{record.filename} ({record.created_at:%Y-%m-%d})"
-            ),
-        )
-        if selected is None:
-            df = ingest.load_and_clean(config.SAMPLE_CSV, body_weight_kg=body_weight)
-            label = config.SAMPLE_CSV.name
+        if runtime.auto_persist_uploads():
+            df, label = _auto_persist_upload(
+                repository, user.user_id, content, filename, df, label
+            )
         else:
-            df = repository.load_dataset(user.user_id, selected.dataset_id)
-            label = selected.filename
+            persist = st.checkbox(
+                "Save privately",
+                value=False,
+                help=(
+                    "Active raw data expires after 30 days and active normalized data after "
+                    "60 days. Deleted blobs may remain recoverable by privileged Azure "
+                    "operators for up to 7 additional days."
+                ),
+            )
+            if persist and st.button(
+                "Save this dataset", type="primary", use_container_width=True
+            ):
+                try:
+                    record = repository.save_single_dataset(
+                        user.user_id,
+                        content,
+                        filename,
+                        df,
+                    )
+                except CloudStorageError as exc:
+                    st.error(str(exc))
+                else:
+                    st.session_state["it_saved_upload_id"] = record.dataset_id
+                    st.session_state.pop("it_data_export_bytes", None)
+                    st.success("Saved privately with automatic expiry.")
+    else:
+        df, label = _render_saved_dataset_picker(repository, user.user_id, body_weight)
 
     _render_cloud_data_controls(user.user_id, repository)
     return df, label, body_weight
+
+
+def _auto_persist_upload(
+    repository,
+    user_id: str,
+    content: bytes,
+    filename: str,
+    df: pd.DataFrame,
+    label: str,
+) -> tuple[pd.DataFrame, str]:
+    """Save the upload into the user's single slot, replacing any previous one."""
+    fingerprint = f"{filename}:{len(content)}:{hashlib.sha256(content).hexdigest()[:16]}"
+    if st.session_state.get("it_persisted_fingerprint") == fingerprint:
+        return df, f"Saved dataset: {filename}"
+
+    try:
+        record = repository.save_single_dataset(user_id, content, filename, df)
+    except CloudStorageError as exc:
+        st.warning(f"{exc} Using this file for the current session only.")
+        return df, label
+
+    st.session_state["it_persisted_fingerprint"] = fingerprint
+    st.session_state["it_saved_upload_id"] = record.dataset_id
+    st.session_state.pop("it_data_export_bytes", None)
+    st.success("Saved to your account — it will be here next time you sign in.")
+    st.caption(
+        "This replaced any previously saved CSV. Remove it any time under "
+        "**My saved data**."
+    )
+    return df, f"Saved dataset: {filename}"
+
+
+def _render_saved_dataset_picker(
+    repository,
+    user_id: str,
+    body_weight: float,
+) -> tuple[pd.DataFrame, str]:
+    """Restore the user's saved dataset by default, falling back to the sample."""
+    records = repository.list_datasets(user_id)
+    if not records:
+        st.caption("No saved CSV yet — showing the synthetic sample.")
+        return (
+            ingest.load_and_clean(config.SAMPLE_CSV, body_weight_kg=body_weight),
+            config.SAMPLE_CSV.name,
+        )
+
+    saved = records[0]
+    use_sample = st.toggle(
+        "Show synthetic sample instead",
+        value=False,
+        help="Your saved CSV stays in your account either way.",
+    )
+    if use_sample:
+        return (
+            ingest.load_and_clean(config.SAMPLE_CSV, body_weight_kg=body_weight),
+            config.SAMPLE_CSV.name,
+        )
+
+    st.success(f"Restored **{saved.filename}** from your account.")
+    return repository.load_dataset(user_id, saved.dataset_id), saved.filename
 
 
 def _render_cloud_data_controls(user_id: str, repository) -> None:
