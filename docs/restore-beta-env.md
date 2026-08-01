@@ -45,55 +45,90 @@ az containerapp secret list -n ca-irontrail-t5padq -g rg-IronTrail --subscriptio
 
 ## What is still missing
 
-Only the four true secrets, which Azure will not return:
+Only three values, and **all three already exist in Key Vault
+`kv-irontrail-t5padq`** — nothing needs rotating or re-creating:
 
-| Secret setting | Where to get it | Recoverable without you? |
-|---|---|---|
-| `google-client-secret` | Google Cloud Console → *IronTrail Beta* → Credentials. **Write-once** — generate a new one if not saved | No |
-| `bootstrap-invite-hash` | SHA-256 of the original bootstrap code | No — see note |
-| `beta-reveal-seed` | Private landing-reveal seed | No — generate a new one |
-| `aad-client-secret` | Entra app registration `5d4f71b2-…` — also write-once | No |
+| AZD variable | Key Vault secret |
+|---|---|
+| `IRONTRAIL_AAD_CLIENT_SECRET` | `aad-client-secret` |
+| `IRONTRAIL_BOOTSTRAP_INVITE_HASH` | `bootstrap-invite-hash` |
+| `IRONTRAIL_BETA_REVEAL_SEED` | `beta-reveal-seed` |
 
-**Bootstrap hash note:** the owner invite has already been redeemed
-(`bootstrapClaimed=true`), so this value only needs to be *present and stable*
-for the template to validate — it is no longer a live credential path. Do not
-invent a value that would re-open bootstrap; reuse the original if you have it,
-otherwise treat re-deriving it as a deliberate decision.
+`IRONTRAIL_GOOGLE_CLIENT_SECRET` was re-issued by the owner on 2026-08-01 and
+is already set.
 
-## Steps
+### The catch: Key Vault uses RBAC, and the owner has no data-plane role
 
-### 1. Set the remaining secrets
+Subscription **Owner** does *not* grant secret read access. `az keyvault secret
+list` returns `(Forbidden) ... Assignment: (not found)` — only the container's
+user-assigned managed identity can read. Grant yourself the data role first
+(you have Owner, so you can), then remove it afterwards if you prefer least
+privilege.
 
-Everything else is already set (see above). Run these **in your own terminal**,
-not through an agent, so the values are never captured in a transcript:
+> **⚠️ This adds a role assignment.** The Stage C2 plan treats unapproved role
+> assignments as a what-if rejection. This one is on the *data plane* for a
+> human, is not part of the Bicep template, and will not appear in an
+> infrastructure what-if — but record it as a deliberate, reversible act.
+
+```powershell
+$sub = "de3679a8-d52d-42bd-9d7c-f7bed44ffc6f"
+$kv  = "kv-irontrail-t5padq"
+$me  = "9f2b1274-9c68-42a9-979e-9570fbc3ff9e"
+
+az role assignment create --assignee $me --role "Key Vault Secrets User" `
+  --scope "/subscriptions/$sub/resourceGroups/rg-IronTrail/providers/Microsoft.KeyVault/vaults/$kv"
+
+Start-Sleep -Seconds 30   # RBAC propagation
+```
+
+Then pipe the values straight into AZD so they are never printed to a terminal
+or captured in an agent transcript:
 
 ```powershell
 cd C:\Dev\active\iron-trail
 
-azd env set IRONTRAIL_GOOGLE_CLIENT_SECRET  "<google-web-client-secret>" -e beta
-azd env set IRONTRAIL_BOOTSTRAP_INVITE_HASH "<sha256-hex>"               -e beta
-azd env set AZURE_AAD_CLIENT_SECRET         "<aad-client-secret>"        -e beta
+azd env set IRONTRAIL_AAD_CLIENT_SECRET `
+  (az keyvault secret show --vault-name $kv -n aad-client-secret --query value -o tsv) -e beta
+azd env set IRONTRAIL_BOOTSTRAP_INVITE_HASH `
+  (az keyvault secret show --vault-name $kv -n bootstrap-invite-hash --query value -o tsv) -e beta
+azd env set IRONTRAIL_BETA_REVEAL_SEED `
+  (az keyvault secret show --vault-name $kv -n beta-reveal-seed --query value -o tsv) -e beta
 ```
 
-If the Google secret was never saved, create a new one in the Google Cloud
-Console (Credentials → the *IronTrail Beta* OAuth client → **Add secret**),
-then set it here. The existing client ID and both redirect URIs stay valid, so
-no Google re-registration is needed.
+Reading the existing seed preserves the current landing-page emoji/control
+pair, so there is no need to re-learn the reveal sequence.
 
-### 2. Reveal seed
+Optional cleanup once provisioning is done:
 
-The live seed cannot be read back from Container Apps. Generate a fresh private
-seed and store it only in the AZD environment:
+```powershell
+az role assignment delete --assignee $me --role "Key Vault Secrets User" `
+  --scope "/subscriptions/$sub/resourceGroups/rg-IronTrail/providers/Microsoft.KeyVault/vaults/$kv"
+```
+
+### If Key Vault access is refused entirely
+
+Only then fall back to re-issuing. `google-client-secret` and
+`aad-client-secret` are write-once in their respective consoles; the reveal
+seed can be regenerated with:
 
 ```powershell
 $seed = -join ((1..48) | ForEach-Object { '{0:x}' -f (Get-Random -Max 16) })
 azd env set IRONTRAIL_BETA_REVEAL_SEED $seed -e beta
 ```
 
-Changing the seed changes the landing-page emoji/control pair, so re-learn the
-new sequence before testing the reveal.
+**Bootstrap hash note:** the owner invite has already been redeemed
+(`bootstrapClaimed=true`), so this value only needs to be *present and stable*
+for the template to validate — it is no longer a live credential path. Do not
+invent a value that would re-open bootstrap.
 
-### 3. Validate before provisioning
+## Steps
+
+### 1. Recover the three remaining secrets from Key Vault
+
+See the section above — grant yourself `Key Vault Secrets User`, then pipe each
+secret directly into `azd env set`.
+
+### 2. Validate before provisioning
 
 ```powershell
 $py = "C:\venvs\3.12\irontrail\Scripts\python.exe"
