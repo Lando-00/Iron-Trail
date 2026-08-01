@@ -44,6 +44,23 @@ def test_css_meets_mobile_tap_target_and_hero_rules() -> None:
     assert "white-space: nowrap" in mobile
 
 
+def test_css_sizes_the_controls_streamlit_actually_renders() -> None:
+    """Streamlit 1.60 renders selects as react-aria comboboxes, so the older
+    [data-baseweb="select"] rule silently stopped matching and dropdowns
+    measured 38px again. Text inputs (35.6), date inputs (35.6) and expander
+    headers (38) were never covered at all."""
+    mobile = ui._CSS.split("@media (max-width: 720px)")[-1]
+
+    for selector in (
+        '[data-testid="stSelectbox"] input',
+        '[data-testid="stSelectbox"] .react-aria-ComboBox > div',
+        '[data-testid="stTextInputRootElement"] input',
+        '[data-testid="stDateInputField"]',
+        '[data-testid="stExpander"] summary',
+    ):
+        assert selector in mobile, f"{selector} is not sized for touch"
+
+
 def test_muted_text_passes_wcag_aa_on_the_app_background() -> None:
     """#5b5b62 scored 2.94:1 on #0a0a0c and failed AA for body text."""
 

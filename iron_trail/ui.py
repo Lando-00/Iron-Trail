@@ -544,9 +544,21 @@ footer { display: none !important; }
     [data-testid="stDownloadButton"] > button,
     [data-baseweb="select"] > div,
     [data-baseweb="select"] button,
-    [data-testid="stNumberInputField"] {
+    [data-testid="stNumberInputField"],
+    /* Streamlit 1.60 renders selects as react-aria comboboxes, so the
+       data-baseweb rule above stopped matching and dropdowns fell back to
+       38px. Measured at 390x844: select 38, text input 35.6, date input 35.6,
+       expander header 38 — all under the 44px guideline. */
+    [data-testid="stSelectbox"] input,
+    [data-testid="stSelectbox"] button,
+    [data-testid="stSelectbox"] .react-aria-ComboBox > div,
+    [data-testid="stTextInputRootElement"],
+    [data-testid="stTextInputRootElement"] input,
+    [data-testid="stDateInputField"],
+    [data-testid="stExpander"] summary {
         min-height: 44px !important;
     }
+    [data-testid="stExpander"] summary { align-items: center !important; }
 
     /* The modebar is too small to hit and overlaps the plot on phones. */
     .modebar-container { display: none !important; }
