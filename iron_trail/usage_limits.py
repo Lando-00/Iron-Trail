@@ -4,16 +4,19 @@ from __future__ import annotations
 import os
 import threading
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 import streamlit as st
 
 from . import runtime
 from .cloud_storage import azure_table_client
 from .coach.providers import Message, Provider, TokenUsage
+
+if TYPE_CHECKING:
+    from .coach.models import ModelProfile
 
 _USAGE_STATE_ROW = "state"
 
@@ -44,8 +47,16 @@ class UsagePolicy:
     output_eur_per_million: float = 2.0
     reservation_ttl_seconds: int = 900
 
+    def with_prices(self, input_eur_per_million: float, output_eur_per_million: float) -> UsagePolicy:
+        """Same limits, different token prices — one policy per model."""
+        return replace(
+            self,
+            input_eur_per_million=input_eur_per_million,
+            output_eur_per_million=output_eur_per_million,
+        )
+
     @classmethod
-    def from_environment(cls) -> "UsagePolicy":
+    def from_environment(cls) -> UsagePolicy:
         return cls(
             review_daily=runtime.env_int("IRONTRAIL_REVIEW_DAILY_LIMIT", 3, minimum=1),
             review_monthly=runtime.env_int(
@@ -127,7 +138,7 @@ class AzureUsageRepository:
         self._table = table_client
 
     @classmethod
-    def from_environment(cls) -> "AzureUsageRepository":
+    def from_environment(cls) -> AzureUsageRepository:
         table_name = os.environ.get("IRONTRAIL_USAGE_TABLE", "IronTrailUsage")
         return cls(azure_table_client(table_name))
 
@@ -423,8 +434,10 @@ class UsageLimiter:
         *,
         input_tokens: int,
         hold_seconds: int | None = None,
+        policy: UsagePolicy | None = None,
     ) -> UsageEvent:
-        if input_tokens > self.policy.max_input_tokens:
+        active = policy or self.policy
+        if input_tokens > active.max_input_tokens:
             raise UsageLimitExceeded("This request is too large for the hosted Coach.")
         now = self.clock()
         event = UsageEvent(
@@ -435,25 +448,31 @@ class UsageLimiter:
             kind=kind,
             status="reserved",
             input_tokens=input_tokens,
-            output_tokens=self.policy.max_output_tokens,
+            output_tokens=active.max_output_tokens,
             cost_eur=token_cost_eur(
                 input_tokens,
-                self.policy.max_output_tokens,
-                self.policy,
+                active.max_output_tokens,
+                active,
             ),
             created_at=now,
             expires_at=now
             + timedelta(
                 seconds=max(
-                    self.policy.reservation_ttl_seconds,
+                    active.reservation_ttl_seconds,
                     hold_seconds or 0,
                 )
             ),
         )
-        return self.repository.reserve(event, policy=self.policy, now=now)
+        return self.repository.reserve(event, policy=active, now=now)
 
-    def complete(self, reservation: UsageEvent, usage: TokenUsage) -> UsageEvent:
-        return self.repository.complete(reservation, usage, policy=self.policy)
+    def complete(
+        self,
+        reservation: UsageEvent,
+        usage: TokenUsage,
+        *,
+        policy: UsagePolicy | None = None,
+    ) -> UsageEvent:
+        return self.repository.complete(reservation, usage, policy=policy or self.policy)
 
     def cancel(self, reservation: UsageEvent) -> None:
         self.repository.cancel(reservation)
@@ -470,12 +489,22 @@ class LimitedProvider:
         limiter: UsageLimiter,
         user_id: str,
         kind: CallKind,
+        model: ModelProfile | None = None,
     ) -> None:
         self.provider = provider
         self.limiter = limiter
         self.user_id = user_id
         self.kind = kind
         self.name = provider.name
+        self.model = model
+        # Bill at this model's rates, not a single global pair.
+        self.policy = (
+            limiter.policy.with_prices(
+                model.input_eur_per_million, model.output_eur_per_million
+            )
+            if model is not None
+            else limiter.policy
+        )
         self.last_usage: TokenUsage | None = None
 
     def chat(self, messages: list[Message], *, timeout: float = 120.0) -> str:
@@ -485,6 +514,7 @@ class LimitedProvider:
             self.kind,
             input_tokens=input_tokens,
             hold_seconds=max(300, int(timeout) + 60),
+            policy=self.policy,
         )
         try:
             response = self.provider.chat(messages, timeout=timeout)
@@ -497,7 +527,7 @@ class LimitedProvider:
             output_tokens=max(1, len(response) // 4),
         )
         self.last_usage = usage
-        self.limiter.complete(reservation, usage)
+        self.limiter.complete(reservation, usage, policy=self.policy)
         return response
 
 

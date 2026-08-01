@@ -12,6 +12,12 @@ param foundryAccountName string
 @description('Azure OpenAI deployment name.')
 param modelDeploymentName string
 
+@description('Deployment used for weekly and monthly reviews.')
+param reviewDeploymentName string = ''
+
+@description('Deployment used for the Ask Coach chat.')
+param chatDeploymentName string = ''
+
 @description('Microsoft identity application client ID.')
 param aadClientId string
 
@@ -278,6 +284,14 @@ resource stageC2ContainerApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'IRONTRAIL_AZURE_OPENAI_DEPLOYMENT'
               value: modelDeploymentName
+            }
+            {
+              name: 'IRONTRAIL_AI_REVIEW_DEPLOYMENT'
+              value: reviewDeploymentName
+            }
+            {
+              name: 'IRONTRAIL_AI_CHAT_DEPLOYMENT'
+              value: chatDeploymentName
             }
             {
               name: 'IRONTRAIL_AZURE_OPENAI_ENDPOINT'

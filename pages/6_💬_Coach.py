@@ -14,7 +14,7 @@ from pathlib import Path
 import streamlit as st
 
 from iron_trail import auth, runtime, sidebar, ui
-from iron_trail.coach import prompts, render, summary
+from iron_trail.coach import models, prompts, render, summary
 from iron_trail.coach.export.vault import save_monthly_review, save_weekly_review
 from iron_trail.coach.providers import Message
 from iron_trail.coach.providers.mock import MockProvider
@@ -43,10 +43,16 @@ def _get_copilot_provider():
     return CopilotProvider()
 
 
-def _get_foundry_provider():
+def _get_foundry_provider(profile):
     from iron_trail.coach.providers.azure_foundry import AzureFoundryProvider
 
-    return AzureFoundryProvider()
+    return AzureFoundryProvider(
+        deployment=profile.deployment,
+        # "" means "send no reasoning_effort" — passing None would let the
+        # global IRONTRAIL_AI_REASONING_EFFORT leak in and 400 on models that
+        # reject it (gpt-5.6-luna rejects 'minimal', Claude has no such field).
+        reasoning_effort=profile.reasoning_effort or "",
+    )
 
 
 @st.cache_resource(show_spinner=False)
@@ -56,11 +62,13 @@ def _get_usage_limiter():
 
 def get_provider(kind: CallKind):
     if runtime.is_cloud():
+        profile = models.resolve_profile(kind.value)
         return LimitedProvider(
-            _get_foundry_provider(),
+            _get_foundry_provider(profile),
             _get_usage_limiter(),
             auth.current_user().user_id,
             kind,
+            model=profile,
         )
     if os.environ.get("COACH_LLM", "").lower() == "mock":
         return MockProvider()
@@ -89,13 +97,14 @@ PERSONALITIES = list(prompts.PERSONALITY_LABELS.keys())
 if "coach_personality" not in st.session_state:
     st.session_state["coach_personality"] = "default"
 
-# Cold-start suggestions for the chat tab — every one is answerable from the
-# structured summary the chat context already builds.
+# Cold-start suggestions for the chat tab. Every one must be answerable from
+# build_chat_context() — a starter that returns "that isn't in the summary"
+# is worse than no starter at all.
 STARTER_PROMPTS = [
-    "What's my weakest muscle group?",
-    "Which lift has stalled the longest?",
-    "How consistent was I this month?",
-    "Is my push:pull balance okay?",
+    "How consistent have I been lately?",
+    "What are my strongest lifts right now?",
+    "How does my streak compare to my best?",
+    "Anything stalling I should worry about?",
 ]
 
 st.title("💬 Coach")
@@ -411,8 +420,17 @@ with tabs[3]:
     st.divider()
     st.markdown("### Provider")
     if runtime.is_cloud():
-        deployment = os.environ.get("IRONTRAIL_AZURE_OPENAI_DEPLOYMENT", "not configured")
-        st.success(f"Using **Microsoft Foundry** deployment `{deployment}`.")
+        review_model = models.resolve_profile("review")
+        chat_model = models.resolve_profile("chat")
+        st.success("Using **Microsoft Foundry** with per-task model routing.")
+        st.markdown(
+            f"- Reviews: `{review_model.deployment}` "
+            f"(€{review_model.input_eur_per_million:.2f} in / "
+            f"€{review_model.output_eur_per_million:.2f} out per 1M tokens)\n"
+            f"- Chat: `{chat_model.deployment}` "
+            f"(€{chat_model.input_eur_per_million:.2f} in / "
+            f"€{chat_model.output_eur_per_million:.2f} out per 1M tokens)"
+        )
         try:
             usage = _get_usage_limiter().snapshot(auth.current_user().user_id)
         except UsageRepositoryError:

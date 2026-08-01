@@ -15,6 +15,12 @@ param foundryAccountName string = 'irontrail-resource'
 @description('Model deployment name created during the later Foundry credit-proof stage.')
 param modelDeploymentName string = 'gpt-5-mini'
 
+@description('Deployment used for weekly and monthly reviews. Defaults to modelDeploymentName.')
+param reviewDeploymentName string = ''
+
+@description('Deployment used for the Ask Coach chat. Defaults to modelDeploymentName.')
+param chatDeploymentName string = ''
+
 @description('Microsoft identity application client ID used by Container Apps Easy Auth.')
 param aadClientId string
 
@@ -116,6 +122,8 @@ module application './modules/application.bicep' = if (!stageC2PatchEnabled) {
     location: location
     maxUsers: maxUsers
     modelDeploymentName: modelDeploymentName
+    reviewDeploymentName: empty(reviewDeploymentName) ? modelDeploymentName : reviewDeploymentName
+    chatDeploymentName: empty(chatDeploymentName) ? modelDeploymentName : chatDeploymentName
     ownerObjectId: ownerObjectId
     grantOwnerKeyVaultAccess: grantOwnerKeyVaultAccess
     currentContainerImage: currentContainerImage
@@ -137,6 +145,8 @@ module stageC2Patch './modules/stage_c2_patch.bicep' = if (stageC2PatchEnabled) 
     location: location
     maxUsers: maxUsers
     modelDeploymentName: modelDeploymentName
+    reviewDeploymentName: empty(reviewDeploymentName) ? modelDeploymentName : reviewDeploymentName
+    chatDeploymentName: empty(chatDeploymentName) ? modelDeploymentName : chatDeploymentName
     ownerObjectId: ownerObjectId
     grantOwnerKeyVaultAccess: grantOwnerKeyVaultAccess
     currentContainerImage: currentContainerImage

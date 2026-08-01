@@ -17,6 +17,12 @@
     "modelDeploymentName": {
       "value": "${IRONTRAIL_AZURE_OPENAI_DEPLOYMENT}"
     },
+    "reviewDeploymentName": {
+      "value": "${IRONTRAIL_AI_REVIEW_DEPLOYMENT=}"
+    },
+    "chatDeploymentName": {
+      "value": "${IRONTRAIL_AI_CHAT_DEPLOYMENT=}"
+    },
     "aadClientId": {
       "value": "${IRONTRAIL_AAD_CLIENT_ID}"
     },
