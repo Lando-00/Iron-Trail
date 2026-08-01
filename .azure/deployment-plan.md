@@ -1,7 +1,8 @@
 # IronTrail Azure Deployment Plan
 
-> **Status:** Deployed — Stage C2 provider-only, five-user ceiling, zero active
-> invites. Canary enrollment parked pending a beta tester (2026-08-01).
+> **Status:** Deployed — Stage C2, five-user ceiling, Microsoft owner plus one
+> enrolled Google member, zero unused invites. Live two-user isolation is not
+> yet proven (2026-08-01).
 
 Generated: 2026-07-11  
 Last verified: 2026-07-25
@@ -791,8 +792,29 @@ non-owner member still needs a single-use invite.
   approved infrastructure change.
 - Provider-only deployment went live at `maxUsers=1`: Microsoft and Google are
   enabled, the retained Google canary reaches only the invite gate, and the
-  Microsoft owner remains in the dashboard. No invite was generated or
-  redeemed.
+  Microsoft owner remains in the dashboard.
+
+#### Canary enrolled — 2026-07-25, recorded 2026-08-01
+
+The paragraph above stated "No invite was generated or redeemed". That was
+written earlier the same day and was never updated. The live authorization
+table shows otherwise, so the record is corrected here:
+
+| Fact | Value |
+|---|---|
+| Google member enrolled | 2026-07-25 14:04 UTC, `role=member`, `status=active` |
+| Invite used | one, redeemed, expired 2026-07-28 |
+| Unused invites now | **zero** |
+| Microsoft owner | `role=admin`, bootstrap claimed |
+| Saved datasets | one, owned by the Microsoft owner; the Google member has none |
+
+The invite was generated from the running app by the owner, so this is a
+legitimate enrolment rather than a gap in the gate. Verified by reading
+`IronTrailAuth` and `IronTrailData` directly.
+
+**Consequence:** the beta has been running two real identities since
+2026-07-25 with live isolation still unproven. The acceptance steps below are
+therefore outstanding work against production, not a rehearsal.
 
 #### User-ceiling revision (2026-08-01)
 
@@ -1006,14 +1028,14 @@ Autopilot must stop before:
 - [x] Run complete `azure-validate` checks with real private Google values.
 - [x] Deploy provider-only mode at one user and prove the unknown-user gate.
 - [x] Restore the lost private AZD environment and apply the five-user ceiling
-  (2026-08-01). Capacity only — zero invites were generated.
+  (2026-08-01).
 - [x] Declare the owner Key Vault grant in IaC instead of a manual assignment.
-- [ ] **Parked pending a beta tester** — generate one private 72-hour invite and
-  enroll the Google canary. Deliberately not issued: an unused code is standing
-  risk, and the ceiling already provides the capacity.
-- [ ] Complete live two-user isolation and suspend/restore acceptance.
-- [ ] Leave zero active invites, update evidence, commit, and push without
-  merging.
+- [x] Enrol the Google canary with a single private invite (2026-07-25, one
+  invite redeemed, zero unused).
+- [ ] **Outstanding against production** — complete live two-user isolation
+  and suspend/restore acceptance. Two real identities have coexisted since
+  2026-07-25 without this being proven.
+- [ ] Update evidence, commit, and push without merging.
 
 ---
 
@@ -1176,20 +1198,19 @@ requests. No retry or further model request was sent.
 
 ## 17. Next Step
 
-**Parked.** The five-user ceiling, the declared Key Vault grant, and the merged
-UI/theme work are live as of 2026-08-01, with **zero active invites**. The beta
-is resting in an owner-only state and needs no further action to stay safe.
+**The canary is already enrolled.** A Google member has been active since
+2026-07-25 alongside the Microsoft owner, with zero unused invites outstanding.
+Live isolation between them has never been proven, so this is outstanding work
+against production rather than a rehearsal.
 
-Resume when a beta tester is ready:
-
-1. Generate exactly one private 72-hour invite and enroll the Google canary.
-2. Prove list/load/cache/export/delete/session isolation using
-   `data/sample/stage_c2_owner_sentinel.csv` and
-   `data/sample/stage_c2_google_sentinel.csv` in separate Microsoft and Google
-   sessions.
-3. Suspend the canary, prove denial after the bounded cache window, restore
+1. Sign in as the Microsoft owner and the Google member at the same time, in
+   separate browser profiles.
+2. Upload `data/sample/stage_c2_owner_sentinel.csv` and
+   `data/sample/stage_c2_google_sentinel.csv` respectively, then prove neither
+   session can list, load, cache, export or delete the other's. The sentinels
+   carry distinct exercise names so a leak is unambiguous.
+3. Suspend the member, prove denial after the bounded cache window, restore
    without a new invite, and prove retained data is unchanged.
-4. Clean the synthetic data, leave zero unused invites, and record evidence.
+4. Clean the synthetic data and record the evidence.
 
-No external tester invitation until steps 2 and 3 pass. The ceiling grants
-capacity, not access.
+Issue no further invitations until steps 2 and 3 pass.

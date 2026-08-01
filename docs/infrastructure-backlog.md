@@ -114,11 +114,30 @@ granted unless an environment opts in.
 
 ### Still open
 
+- **The same RBAC gap exists on Storage.** On 2026-08-01, verifying who was
+  enrolled in the beta required `az role assignment create ... "Storage Table
+  Data Reader"` because subscription Owner grants no data-plane read on
+  `IronTrailAuth` / `IronTrailData` either. The grant was removed again
+  afterwards, leaving only the two managed-identity assignments.
+
+  The in-app admin controls cover normal membership questions, so standing
+  human access is not warranted. But incident response should not depend on
+  improvising a role assignment. Extend `grantOwnerKeyVaultAccess` into a
+  single `grantOwnerDiagnosticAccess` flag covering Key Vault *and* read-only
+  Storage table access, so break-glass is declared in one reviewable place.
+
 - **No backup of the non-secret AZD keys.** Losing `.azure/beta/.env` cost an
   hour of recovery. The values are reconstructible from the live resources (see
   `docs/restore-beta-env.md`), but that should be a script, not archaeology.
   Suggest `scripts/export_beta_env_template.py` that writes the **key names
   only**, safe to commit.
+
+- **Plan drift is not detectable.** The plan claimed "No invite was generated
+  or redeemed" for a week after a member had in fact enrolled, and separately
+  claimed `maxUsers=1` while the live app ran `2`. Both were only caught by
+  reading Azure directly. A read-only `scripts/audit_beta_state.py` that prints
+  member count, invite state and key env values would make the plan verifiable
+  instead of trusted.
 
 ---
 
