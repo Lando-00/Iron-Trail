@@ -354,6 +354,18 @@ The owner-only beta is deployed through Azure Developer CLI + Bicep:
   configured separately.
 - Application Insights + Log Analytics and a EUR 25 budget ceiling.
 
+The container image pins its base by digest and installs dependencies from
+`requirements-cloud.lock` with `pip --require-hashes`, so a remote ACR build
+cannot pull a newer or tampered artifact than the one that was reviewed. After
+changing anything in `[project.dependencies]` or the `cloud` extra, regenerate
+the lockfile — it must be resolved for the container's platform, not yours:
+
+```bash
+pip install uv
+python scripts/lock_dependencies.py           # rewrite it
+python scripts/lock_dependencies.py --check   # verify it is current
+```
+
 See [`.azure/deployment-plan.md`](.azure/deployment-plan.md) for the exact
 architecture, phased approvals, cost assumptions, and hard-stop conditions.
 Stage C live acceptance is complete. The current release boundary remains one

@@ -1,4 +1,9 @@
-FROM python:3.12-slim
+# Pinned by digest, not by tag: `azd deploy` triggers a remote ACR build that
+# would otherwise resolve `3.12-slim` to whatever is newest at that moment.
+# This is the multi-arch index digest for python:3.12-slim as of 2026-08-01
+# (linux/amd64 -> sha256:cab2dbf575e971934a81e4622f5aba17aa7929719bd7e31033a3a83b97fd0464).
+# To move it on: docker buildx imagetools inspect python:3.12-slim
+FROM python:3.12-slim@sha256:57cd7c3a7a273101a6485ba99423ee568157882804b1124b4dd04266317710de
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -14,9 +19,14 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 10001 appuser
 
-COPY --chown=appuser:appuser . .
+# Dependencies first, from a fully hash-pinned lockfile. --require-hashes makes
+# pip refuse anything whose artifact does not match, so a compromised or
+# re-uploaded release on PyPI cannot enter the image. Copying only the lockfile
+# here also means application edits do not invalidate this layer.
+COPY --chown=appuser:appuser requirements-cloud.lock ./
+RUN python -m pip install --no-cache-dir --require-hashes -r requirements-cloud.lock
 
-RUN python -m pip install --no-cache-dir ".[cloud]"
+COPY --chown=appuser:appuser . .
 
 USER appuser
 
