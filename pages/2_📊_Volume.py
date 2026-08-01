@@ -37,8 +37,9 @@ if weeks is not None:
     vol = vol[vol["week"] >= start_week]
 
 ui.section_title("Weekly tonnage by muscle")
+plot_vol = metrics.group_minor_muscles(vol)
 fig = px.bar(
-    vol, x="week", y="volume_kg", color="primary_muscle",
+    plot_vol, x="week", y="volume_kg", color="primary_muscle",
     labels={"week": "Week", "volume_kg": "Tonnage (kg)", "primary_muscle": "Muscle"},
     color_discrete_sequence=px.colors.qualitative.Vivid,
 )

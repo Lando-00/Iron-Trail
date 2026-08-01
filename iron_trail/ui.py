@@ -618,7 +618,7 @@ def chart_layout(fig: go.Figure, *, date_axis: bool = False) -> go.Figure:
             "t": 24,
             "b": 64 if has_legend else 40,
         },
-        legend={"orientation": "h", "yanchor": "top", "y": -0.24, "x": 0, "xanchor": "left"},
+        legend={"orientation": "h", "yanchor": "top", "y": -0.18, "x": 0, "xanchor": "left"},
     )
     if not polar:
         fig.update_xaxes(automargin=True)
