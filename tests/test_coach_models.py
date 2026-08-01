@@ -137,7 +137,7 @@ def test_every_starter_prompt_is_answerable_from_the_chat_context() -> None:
 
     supported = {
         "consistent": "session_count_30d",
-        "strongest": "top_e1rm_exercises",
+        "strongest": "exercise_catalog",
         "streak": "current_streak_days",
         "stalling": "plateau_watch",
     }

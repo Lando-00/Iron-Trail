@@ -397,7 +397,11 @@ with tabs[2]:
         with st.chat_message("user"):
             st.markdown(user_input)
 
-        ctx = coach_chat.build_chat_context(df)
+        ctx = coach_chat.build_chat_context(
+            df,
+            question=user_input,
+            history=st.session_state["coach_chat_history"][:-1],
+        )
         messages = coach_chat.build_chat_messages(
             history=st.session_state["coach_chat_history"][:-1],  # exclude the just-added user message
             user_input=user_input,
