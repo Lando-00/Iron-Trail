@@ -5,6 +5,17 @@
 > **Owner:** a separate Copilot session running in autopilot
 > **Created:** 2026-08-01
 
+## Status
+
+**Items 1, 2 and 3 are done** on `feature/mobile-polish` — the responsive chart
+helper, the Volume legend grouping, the CSS custom-properties refactor and the
+theme picker. A fourth fix came out of the work: the 44px tap-target rule had
+silently stopped matching on Streamlit 1.60.
+
+Items **4** (recent-workouts mobile cards) and **5** (badge grid) are **not**
+done — both restructure Overview and want a design opinion first. See
+[`docs/mobile-ui-review.md`](./mobile-ui-review.md) for the measured results.
+
 ## Why this branch exists
 
 The main worktree (`C:\Dev\active\iron-trail`) is busy with the Stage C2 Google
