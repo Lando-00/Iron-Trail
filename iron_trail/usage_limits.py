@@ -1,6 +1,7 @@
 """Per-user and global limits for hosted Coach model calls."""
 from __future__ import annotations
 
+import logging
 import os
 import threading
 import uuid
@@ -16,6 +17,8 @@ from .cloud_storage import azure_table_client
 from .coach.providers import Message, Provider, TokenUsage
 
 _USAGE_STATE_ROW = "state"
+
+logger = logging.getLogger(__name__)
 
 
 class CallKind(StrEnum):
@@ -117,6 +120,14 @@ class UsageRepository(Protocol):
         policy: UsagePolicy,
     ) -> UsageEvent: ...
 
+    def fail(
+        self,
+        reservation: UsageEvent,
+        usage: TokenUsage | None,
+        *,
+        policy: UsagePolicy,
+    ) -> UsageEvent: ...
+
     def cancel(self, reservation: UsageEvent) -> None: ...
 
     def snapshot(self, user_id: str, current: date) -> UsageSnapshot: ...
@@ -197,6 +208,18 @@ class AzureUsageRepository:
             cost_eur=token_cost_eur(usage.input_tokens, usage.output_tokens, policy),
             created_at=reservation.created_at,
         )
+        self._replace_event(reservation, event)
+        return event
+
+    def fail(
+        self,
+        reservation: UsageEvent,
+        usage: TokenUsage | None,
+        *,
+        policy: UsagePolicy,
+    ) -> UsageEvent:
+        """Record a call that failed but may already have been billed."""
+        event = _failed_event(reservation, usage, policy)
         self._replace_event(reservation, event)
         return event
 
@@ -387,6 +410,18 @@ class InMemoryUsageRepository:
             self.events[event.reservation_id] = event
             return event
 
+    def fail(
+        self,
+        reservation: UsageEvent,
+        usage: TokenUsage | None,
+        *,
+        policy: UsagePolicy,
+    ) -> UsageEvent:
+        with self._lock:
+            event = _failed_event(reservation, usage, policy)
+            self.events[event.reservation_id] = event
+            return event
+
     def cancel(self, reservation: UsageEvent) -> None:
         with self._lock:
             self.events.pop(reservation.reservation_id, None)
@@ -455,6 +490,9 @@ class UsageLimiter:
     def complete(self, reservation: UsageEvent, usage: TokenUsage) -> UsageEvent:
         return self.repository.complete(reservation, usage, policy=self.policy)
 
+    def fail(self, reservation: UsageEvent, usage: TokenUsage | None = None) -> UsageEvent:
+        return self.repository.fail(reservation, usage, policy=self.policy)
+
     def cancel(self, reservation: UsageEvent) -> None:
         self.repository.cancel(reservation)
 
@@ -488,8 +526,8 @@ class LimitedProvider:
         )
         try:
             response = self.provider.chat(messages, timeout=timeout)
-        except Exception:
-            self.limiter.cancel(reservation)
+        except Exception as exc:
+            self._record_failure(reservation, exc)
             raise
 
         usage = self.provider.last_usage or TokenUsage(
@@ -499,6 +537,37 @@ class LimitedProvider:
         self.last_usage = usage
         self.limiter.complete(reservation, usage)
         return response
+
+    def _record_failure(self, reservation: UsageEvent, exc: BaseException) -> None:
+        """Keep spend on the ledger unless the model provably never ran.
+
+        Cancelling on every exception refunded calls Azure had already billed:
+        a prompt that burns the whole completion budget on reasoning tokens
+        returns no assistant text, and a client-side timeout still leaves the
+        server generating. Both raise, and both cost money. Deleting the row
+        gave back the user's allowance *and* removed the amount from the global
+        monthly budget that is supposed to be the backstop.
+
+        A bookkeeping error here must not replace the provider error the caller
+        is about to see, so failures to record are logged and swallowed.
+        """
+        usage = getattr(self.provider, "last_usage", None)
+        try:
+            if usage is not None:
+                # The provider reported real token counts, so this was billed.
+                self.limiter.fail(reservation, usage)
+            elif is_pre_billing_error(exc):
+                self.limiter.cancel(reservation)
+            else:
+                # Unknown outcome — assume it was billed and keep the
+                # reservation's estimate. Erring the other way is what created
+                # the hole.
+                self.limiter.fail(reservation, None)
+        except Exception:
+            logger.exception(
+                "could not record the outcome of reservation %s",
+                reservation.reservation_id,
+            )
 
 
 @st.cache_resource(show_spinner=False)
@@ -550,6 +619,76 @@ def _enforce_limits(
         raise UsageLimitExceeded("The IronTrail Coach monthly budget has been reached.")
 
 
+def _failed_event(
+    reservation: UsageEvent,
+    usage: TokenUsage | None,
+    policy: UsagePolicy,
+) -> UsageEvent:
+    """A ledger row for a call that failed after it may have been billed.
+
+    With real token counts the cost is exact; without them the reservation's
+    estimate (the maximum the call could have cost) is kept, because guessing
+    low is what lets a caller spend without being counted.
+    """
+    input_tokens = usage.input_tokens if usage is not None else reservation.input_tokens
+    output_tokens = usage.output_tokens if usage is not None else reservation.output_tokens
+    cost_eur = (
+        token_cost_eur(input_tokens, output_tokens, policy)
+        if usage is not None
+        else reservation.cost_eur
+    )
+    return UsageEvent(
+        reservation_id=reservation.reservation_id,
+        month=reservation.month,
+        day=reservation.day,
+        user_id=reservation.user_id,
+        kind=reservation.kind,
+        status="failed",
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cost_eur=cost_eur,
+        created_at=reservation.created_at,
+    )
+
+
+def is_pre_billing_error(exc: BaseException) -> bool:
+    """True only for failures that provably never reached the model.
+
+    These are rejections — bad configuration, a refused connection, an auth or
+    quota rejection — where Azure never ran inference and so never billed.
+    Anything else, including a client-side timeout, is treated as billed.
+
+    A timeout deliberately does *not* qualify: the server keeps generating
+    after the client gives up. ``APITimeoutError`` subclasses
+    ``APIConnectionError`` in the OpenAI SDK, so it is checked first.
+    """
+    if isinstance(exc, runtime.ConfigurationError | UsageLimitExceeded):
+        return True
+    try:
+        from openai import (
+            APIConnectionError,
+            APITimeoutError,
+            AuthenticationError,
+            BadRequestError,
+            NotFoundError,
+            PermissionDeniedError,
+            RateLimitError,
+        )
+    except ImportError:
+        return False
+    if isinstance(exc, APITimeoutError):
+        return False
+    return isinstance(
+        exc,
+        APIConnectionError
+        | AuthenticationError
+        | BadRequestError
+        | NotFoundError
+        | PermissionDeniedError
+        | RateLimitError,
+    )
+
+
 def _partition_active(
     events: list[UsageEvent],
     now: datetime,
@@ -563,7 +702,7 @@ def _partition_active(
             and event.expires_at <= now
         ):
             expired.append(event)
-        elif event.status in {"reserved", "completed"}:
+        elif event.status in {"reserved", "completed", "failed"}:
             active.append(event)
     return active, expired
 
