@@ -88,12 +88,131 @@ PALETTES: dict[str, dict[str, str]] = {
         "text_soft": "#c2c2c8",
         "text_tab": "#c2c2c8",
     },
+    # Cyanotype blueprint. The first palette whose neutrals carry a hue rather
+    # than being grey, so it reads as engineered rather than merely dark.
+    # `accent_gold` is cyan here: the key names a role (the primary accent),
+    # not a hue.
+    "blueprint": {
+        **COLORS,
+        "bg": "#0b1626",
+        "surface": "rgba(207,228,255,0.04)",
+        "surface_strong": "rgba(207,228,255,0.08)",
+        "border": "rgba(207,228,255,0.12)",
+        "border_strong": "rgba(207,228,255,0.22)",
+        "overlay": "#cfe4ff",
+        "text_primary": "#e8f1ff",
+        "text_secondary": "#9fb6d4",
+        "text_muted": "#8ca4c4",
+        "text_soft": "#c4d6ee",
+        "text_tab": "#c4d6ee",
+        "accent_gold": "#6fd3e8",
+        "accent_blue": "#7f8fff",
+        "accent_red": "#ff786c",
+        "accent_green": "#42d3a0",
+        "accent_lavender": "#ff9ad6",
+        "accent_peach": "#ffc14d",
+        "accent_mint": "#42d3a0",
+        "tint_gold": "#a9e6f2",
+        "tint_blue": "#c3caff",
+        "tint_blue_soft": "#d7d9ff",
+        "tint_red": "#ffb8ad",
+        "tint_green": "#a4efcf",
+    },
+    # Cast iron, a wooden platform and chalk dust — the only warm dark.
+    "chalk_iron": {
+        **COLORS,
+        "bg": "#17120f",
+        "surface": "rgba(255,238,222,0.035)",
+        "surface_strong": "rgba(255,238,222,0.07)",
+        "border": "rgba(255,238,222,0.11)",
+        "border_strong": "rgba(255,238,222,0.20)",
+        "overlay": "#ffeede",
+        "text_primary": "#f4ece2",
+        "text_secondary": "#b3a396",
+        "text_muted": "#a1907f",
+        "text_soft": "#d8cabb",
+        "text_tab": "#d8cabb",
+        "accent_gold": "#e0a34e",
+        "accent_blue": "#6ebad7",
+        "accent_red": "#e05b48",
+        "accent_green": "#58c69a",
+        "accent_lavender": "#e895c4",
+        "accent_peach": "#f2c15e",
+        "accent_mint": "#58c69a",
+        "tint_gold": "#f0c98c",
+        "tint_blue": "#b4dcea",
+        "tint_blue_soft": "#cce8f2",
+        "tint_red": "#f3aa9f",
+        "tint_green": "#a9e5c7",
+    },
+    # Green phosphor CRT, leaning into the mono numerals the app already uses.
+    # Body text is deliberately desaturated so `accent_green` still reads as a
+    # *status* rather than dissolving into the theme.
+    "phosphor": {
+        **COLORS,
+        "bg": "#040806",
+        "surface": "rgba(201,255,218,0.035)",
+        "surface_strong": "rgba(201,255,218,0.07)",
+        "border": "rgba(201,255,218,0.12)",
+        "border_strong": "rgba(201,255,218,0.20)",
+        "overlay": "#c9ffda",
+        "text_primary": "#c9ffd9",
+        "text_secondary": "#8fbd9b",
+        "text_muted": "#71967d",
+        "text_soft": "#b4e4c2",
+        "text_tab": "#b4e4c2",
+        "accent_gold": "#ffd166",
+        "accent_blue": "#68b8ff",
+        "accent_red": "#ff6b5b",
+        "accent_green": "#2ed99b",
+        "accent_lavender": "#f59ad4",
+        "accent_peach": "#ffb038",
+        "accent_mint": "#2ed99b",
+        "tint_gold": "#ffe4a3",
+        "tint_blue": "#b7d8ff",
+        "tint_blue_soft": "#d0e7ff",
+        "tint_red": "#ffa599",
+        "tint_green": "#9cf2cf",
+    },
+    # Warm paper, for daylight and outdoors. This is the palette `overlay`
+    # exists for: flipping it to near-black turns every wash and border from
+    # highlight into shadow, so the glass surfaces still read correctly.
+    "daylight": {
+        **COLORS,
+        "bg": "#f4f1ea",
+        "surface": "rgba(28,26,22,0.04)",
+        "surface_strong": "rgba(28,26,22,0.07)",
+        "border": "rgba(28,26,22,0.14)",
+        "border_strong": "rgba(28,26,22,0.26)",
+        "overlay": "#1c1a16",
+        "text_primary": "#1d1b17",
+        "text_secondary": "#5c574d",
+        "text_muted": "#6b6558",
+        "text_soft": "#332f28",
+        "text_tab": "#443f36",
+        "accent_gold": "#7a560b",
+        "accent_blue": "#1f5fa8",
+        "accent_red": "#b23122",
+        "accent_green": "#146f62",
+        "accent_lavender": "#6244b8",
+        "accent_peach": "#87436e",
+        "accent_mint": "#146f62",
+        "tint_gold": "#674708",
+        "tint_blue": "#17497f",
+        "tint_blue_soft": "#1b5590",
+        "tint_red": "#8d2418",
+        "tint_green": "#155a52",
+    },
 }
 
 PALETTE_LABELS = {
     "dark_gold": "Dark gold (default)",
     "high_contrast": "High contrast",
     "amoled": "AMOLED black",
+    "blueprint": "Blueprint",
+    "chalk_iron": "Chalk & iron",
+    "phosphor": "Phosphor CRT",
+    "daylight": "Daylight (light)",
 }
 
 # Emitted as `--it-<name>` custom properties so the stylesheet in ui.py holds no
@@ -150,6 +269,12 @@ def css_variables(colors: dict[str, str] | None = None) -> str:
 
 
 CHART_CYCLE: list[str] = []
+#: Redundant encoding for categorical series. Colour alone cannot separate six
+#: series: measured across every palette, the closest pair collapses to ~0.02
+#: under protanopia and the tightest greyscale gap is ~0.001, so PDF exports
+#: and red-green colour blindness both lose them. Pattern is paired with colour
+#: wherever a chart draws more than a couple of categories.
+CHART_PATTERNS: tuple[str, ...] = ("", "/", "\\", "x", "-", "+", ".")
 ARCHETYPE_COLORS: dict[str, str] = {}
 PLATEAU_COLORS: dict[str, str] = {}
 

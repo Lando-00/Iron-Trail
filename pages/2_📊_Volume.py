@@ -1,7 +1,6 @@
 """Volume page — weekly tonnage by muscle, push:pull ratio, movement radar."""
 from __future__ import annotations
 
-
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -38,11 +37,18 @@ if weeks is not None:
 
 ui.section_title("Weekly tonnage by muscle")
 plot_vol = metrics.group_minor_muscles(vol)
+# Theme colours, not Plotly's Vivid: the hardcoded sequence ignored the palette
+# entirely and read as dark-on-light in the Daylight theme. Pattern is carried
+# alongside colour because six stacked series are not separable by hue under
+# red-green colour blindness, or at all once a review is exported to PDF.
 fig = px.bar(
     plot_vol, x="week", y="volume_kg", color="primary_muscle",
+    pattern_shape="primary_muscle",
     labels={"week": "Week", "volume_kg": "Tonnage (kg)", "primary_muscle": "Muscle"},
-    color_discrete_sequence=px.colors.qualitative.Vivid,
+    color_discrete_sequence=theme.CHART_CYCLE,
+    pattern_shape_sequence=list(theme.CHART_PATTERNS),
 )
+fig.update_traces(marker_line_width=0)
 fig.update_layout(barmode="stack")
 ui.plotly_chart(fig, "tonnage", size="xtall", date_axis=True)
 

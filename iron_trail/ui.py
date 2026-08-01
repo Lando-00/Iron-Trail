@@ -516,10 +516,100 @@ footer { display: none !important; }
 [data-testid="stExpandSidebarButton"] [data-testid="stIconMaterial"] { color: var(--it-accent-gold) !important; }
 
 /* ---------------------------------------------------------------
-   Mobile. Measured at 390x844: default tap targets were 24-38px
-   (below the 44px guideline), the hero number wrapped to two lines,
-   and the Plotly modebar was unusable at 24x22.
+   Streamlit's own widget chrome. `.streamlit/config.toml` bakes a
+   fixed textColor/backgroundColor into emotion classes at startup,
+   and that cannot change per session — so every palette other than
+   the one the config describes would show stale ink and stale
+   surfaces (a dark-grey uploader sitting on a light or blue page).
+   Re-point that chrome at the palette variables instead.
    --------------------------------------------------------------- */
+[data-testid="stSidebar"],
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"],
+[data-testid="stSidebarNav"] a,
+[data-testid="stSidebarNavLink"],
+[data-testid="stSidebarNavLink"] span,
+[data-testid="stWidgetLabel"],
+[data-testid="stWidgetLabel"] p,
+[data-testid="stFileUploaderDropzoneInstructions"],
+[data-testid="stFileUploaderDropzoneInstructions"] span,
+[data-testid="stFileUploaderDropzoneInstructions"] small {
+    color: var(--it-text-primary) !important;
+}
+
+[data-testid="stSidebarNavLink"]:hover {
+    background: rgba(var(--it-overlay-rgb), 0.08) !important;
+}
+
+/* Surfaces that carry their own background from the config. */
+[data-testid="stFileUploaderDropzone"],
+[data-testid="stNumberInputContainer"],
+[data-testid="stTextInputRootElement"],
+[data-baseweb="select"] > div,
+[data-testid="stSelectbox"] div[role="combobox"],
+[data-testid="stSliderTickBarMin"],
+[data-testid="stSliderTickBarMax"] {
+    background: rgba(var(--it-overlay-rgb), 0.05) !important;
+    border-color: rgba(var(--it-overlay-rgb), 0.18) !important;
+    color: var(--it-text-primary) !important;
+}
+
+/* Inner widget wrappers keep the configured page colour, which shows through
+   as a stale dark slab inside an otherwise re-themed control. */
+[data-testid="stSidebar"] div[role="group"],
+[data-testid="stMain"] div[role="group"],
+[data-baseweb="input"],
+[data-baseweb="base-input"],
+[data-testid="stSelectbox"] [class*="valueContainer"] {
+    background: transparent !important;
+    color: var(--it-text-primary) !important;
+}
+
+/* Plotly's own SVG canvas is painted with the configured page colour, which
+   shows as a near-black slab inside any palette that is not the default. The
+   template already draws transparent paper and plot areas. */
+[data-testid="stPlotlyChart"] .main-svg {
+    background: transparent !important;
+}
+
+/* Every input keeps the configured ink, which is invisible on a light page. */
+input,
+textarea,
+[data-testid="stNumberInputField"],
+[data-testid="stDateInputField"],
+[data-testid="stChatInputTextArea"] {
+    color: var(--it-text-primary) !important;
+    -webkit-text-fill-color: var(--it-text-primary) !important;
+    caret-color: var(--it-accent-gold);
+}
+input::placeholder,
+textarea::placeholder {
+    color: var(--it-text-muted) !important;
+    -webkit-text-fill-color: var(--it-text-muted) !important;
+}
+
+[data-testid="stFileUploaderDropzone"] [data-testid="stBaseButton-secondary"] {
+    background: rgba(var(--it-overlay-rgb), 0.10) !important;
+    border-color: rgba(var(--it-overlay-rgb), 0.22) !important;
+    color: var(--it-text-primary) !important;
+}
+
+/* Popover menus render in a portal outside .stApp. */
+[data-baseweb="popover"] [role="listbox"],
+[data-baseweb="menu"],
+[data-baseweb="menu"] li {
+    background: var(--it-bg) !important;
+    color: var(--it-text-primary) !important;
+}
+[data-baseweb="menu"] li:hover {
+    background: rgba(var(--it-overlay-rgb), 0.10) !important;
+}
+
+[data-testid="stSidebarCollapseButton"] svg,
+[data-testid="stSidebarCollapseButton"] [data-testid="stIconMaterial"] {
+    color: var(--it-text-secondary) !important;
+}
+
+
 @media (max-width: 720px) {
     /* Leave room for the floating Menu button where the sidebar starts collapsed. */
     .block-container { padding-top: 4.25rem; }
