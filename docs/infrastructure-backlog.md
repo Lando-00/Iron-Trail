@@ -109,15 +109,21 @@ improvised.
 
 ---
 
-## 2. `IRONTRAIL_MAX_USERS` drift *(open)*
+## 2. `IRONTRAIL_MAX_USERS` drift *(resolved 2026-08-01)*
 
-The live Container App reports `IRONTRAIL_MAX_USERS = 2`, while
-`.azure/deployment-plan.md` states provider-only is live at `maxUsers=1`.
+The live Container App reported `IRONTRAIL_MAX_USERS = 2` while
+`.azure/deployment-plan.md` stated provider-only was live at `maxUsers=1`.
 `azd deploy` cannot change environment variables — only `azd provision` can —
-so this predates the 2026-08-01 deploys.
+so the drift predated the 2026-08-01 deploys and its origin is unknown.
 
-Reconcile before canary enrollment: either the plan is stale, or a provision
-ran at 2 and the beta is already at canary capacity.
+**Resolution:** the owner approved a flat ceiling of **5**, superseding the
+staged `1 -> 2 -> 5` rollout rather than guessing which value was intended. The
+isolation, suspension, and restoration gates are unchanged; capacity is not
+permission, since every non-owner member still requires a single-use invite and
+there are zero active invites.
+
+Applied to the AZD environment on 2026-08-01. Takes effect on the live app only
+after the next `azd provision`.
 
 ---
 
