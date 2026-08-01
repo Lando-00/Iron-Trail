@@ -142,13 +142,23 @@ def _render_cloud_data_source() -> tuple[pd.DataFrame, str, float]:
     auth.render_account_controls(user)
     st.divider()
 
+    if runtime.auto_persist_uploads():
+        upload_help = (
+            "The file is sent to the IronTrail server and saved to your account so it is "
+            "still here next time you sign in. It replaces any CSV you saved before. "
+            "Active raw data expires after 30 days and normalized data after 60 days; "
+            "you can remove it any time under My saved data."
+        )
+    else:
+        upload_help = (
+            "The file is sent to the IronTrail server for this session. It is stored in "
+            "Azure only when you explicitly choose Save privately."
+        )
+
     uploaded = st.file_uploader(
         "Upload a Hevy CSV",
         type=["csv"],
-        help=(
-            "The file is sent to the IronTrail server for this session. It is stored in "
-            "Azure only when you explicitly choose Save privately."
-        ),
+        help=upload_help,
         key="csv_upload_widget",
     )
     if uploaded is not None:

@@ -28,6 +28,7 @@ _SENSITIVE_SESSION_KEYS = {
     "it_authenticated_identity_seen",
     "it_data_export_bytes",
     "it_new_invite_code",
+    "it_persisted_fingerprint",
     "it_saved_upload_id",
     "it_upload_bytes",
     "it_upload_name",
