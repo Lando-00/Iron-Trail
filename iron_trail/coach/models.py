@@ -24,17 +24,25 @@ class ModelProfile:
 
 
 # USD per million tokens, treated as EUR at parity like the original defaults.
-# reasoning_effort is not cosmetic: gpt-5.6-luna rejects 'minimal' with a 400,
-# while the gpt-5 reasoning models burn their whole output budget without it.
+# reasoning_effort is not cosmetic and is not portable between models:
+#   gpt-5.6-luna accepts only 'none', 'low', 'medium', 'high', 'xhigh' — it
+#     returns 400 for 'minimal', which the gpt-5 models use.
+#   the gpt-5 reasoning models burn their whole output budget without 'minimal'
+#     and then return no assistant text at all.
+# Reasoning tokens are billed as output, so effort is a real cost lever:
+# measured on luna, high costs ~1.8x low per call.
 MODEL_CATALOG: dict[str, ModelProfile] = {
     "gpt-5-mini": ModelProfile("gpt-5-mini", 0.25, 2.00, "minimal"),
     "gpt-5-nano": ModelProfile("gpt-5-nano", 0.05, 0.40, "minimal"),
-    "gpt-5.6-luna": ModelProfile("gpt-5.6-luna", 1.00, 6.00, "low"),
+    "gpt-5.6-luna": ModelProfile("gpt-5.6-luna", 1.00, 6.00, "high"),
     "gpt-4.1-mini": ModelProfile("gpt-4.1-mini", 0.40, 1.60, None),
     "gpt-4.1-nano": ModelProfile("gpt-4.1-nano", 0.10, 0.40, None),
     "claude-haiku-4-5": ModelProfile("claude-haiku-4-5", 1.00, 5.00, None),
     "claude-sonnet-5": ModelProfile("claude-sonnet-5", 2.00, 10.00, None),
 }
+
+# Rejected with 400 by gpt-5.6-luna; kept so tests can assert we never send them.
+LUNA_SUPPORTED_EFFORTS = ("none", "low", "medium", "high", "xhigh")
 
 REVIEW_DEPLOYMENT_ENV = "IRONTRAIL_AI_REVIEW_DEPLOYMENT"
 CHAT_DEPLOYMENT_ENV = "IRONTRAIL_AI_CHAT_DEPLOYMENT"

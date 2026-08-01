@@ -10,6 +10,7 @@ from iron_trail.coach import chat as coach_chat
 from iron_trail.coach.models import (
     CHAT_DEPLOYMENT_ENV,
     FALLBACK_DEPLOYMENT_ENV,
+    LUNA_SUPPORTED_EFFORTS,
     MODEL_CATALOG,
     REVIEW_DEPLOYMENT_ENV,
     resolve_profile,
@@ -57,9 +58,12 @@ def test_unknown_deployment_falls_back_to_the_legacy_global_prices() -> None:
 
 
 def test_luna_never_requests_the_minimal_reasoning_effort() -> None:
-    """Verified against the live deployment: gpt-5.6-luna returns
-    400 'does not support minimal' for reasoning_effort=minimal."""
-    assert MODEL_CATALOG["gpt-5.6-luna"].reasoning_effort == "low"
+    """Verified against the live deployment: gpt-5.6-luna returns 400 with
+    "Supported values are: 'none', 'low', 'medium', 'high', and 'xhigh'"."""
+    luna = MODEL_CATALOG["gpt-5.6-luna"]
+    assert luna.reasoning_effort == "high"
+    assert luna.reasoning_effort in LUNA_SUPPORTED_EFFORTS
+    assert "minimal" not in LUNA_SUPPORTED_EFFORTS
     assert MODEL_CATALOG["gpt-5-mini"].reasoning_effort == "minimal"
 
 
@@ -90,7 +94,7 @@ def test_a_model_with_reasoning_effort_keeps_it() -> None:
         reasoning_effort=luna.reasoning_effort or "",
         client=object(),
     )
-    assert provider.reasoning_effort == "low"
+    assert provider.reasoning_effort == "high"
 
 
 def test_costs_are_billed_per_model_not_globally() -> None:
