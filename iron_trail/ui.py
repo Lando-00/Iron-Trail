@@ -450,6 +450,18 @@ h3 { font-size: 15px; color: #b5b5b9; font-weight: 600; }
     color: #d4a843;
 }
 
+/* Chart heights are driven by CSS so one server-rendered figure can be tall on
+   desktop and short on a phone. ui.plotly_chart() wraps each chart in a
+   container keyed `it-chart-<size>-<name>`, and the figure itself is rendered
+   with autosize so Plotly measures this box instead of a hardcoded height. */
+[class*="st-key-it-chart-"] [data-testid="stPlotlyChart"] {
+    height: var(--it-chart-h, 400px) !important;
+}
+[class*="st-key-it-chart-xtall"] { --it-chart-h: 460px; }
+[class*="st-key-it-chart-tall"] { --it-chart-h: 440px; }
+[class*="st-key-it-chart-standard"] { --it-chart-h: 320px; }
+[class*="st-key-it-chart-compact"] { --it-chart-h: 260px; }
+
 /* Tighter top padding for the main content area */
 .block-container { padding-top: 2rem; padding-bottom: 4rem; max-width: 1280px; }
 
@@ -539,6 +551,12 @@ footer { display: none !important; }
     /* The modebar is too small to hit and overlaps the plot on phones. */
     .modebar-container { display: none !important; }
 
+    /* Desktop chart heights waste most of a 844px-tall viewport. */
+    [class*="st-key-it-chart-xtall"] { --it-chart-h: 380px; }
+    [class*="st-key-it-chart-tall"] { --it-chart-h: 360px; }
+    [class*="st-key-it-chart-standard"] { --it-chart-h: 300px; }
+    [class*="st-key-it-chart-compact"] { --it-chart-h: 240px; }
+
     .it-hero { padding: 24px 22px 22px; border-radius: 16px; }
     .it-hero-value {
         font-size: clamp(40px, 12vw, 72px);
@@ -564,6 +582,67 @@ def setup_page(title: str, icon: str, *, layout: str = "wide") -> None:
     from .auth import require_invited_user
 
     require_invited_user()
+
+
+PLOT_CONFIG = {"displayModeBar": False, "responsive": True}
+
+CHART_SIZES = ("xtall", "tall", "standard", "compact")
+
+# Only override the month-to-year tick band. Day-level ticks (what desktop
+# picks) keep Plotly's automatic format, so the desktop axis is untouched while
+# a phone shows `Mar '26` (~45px) instead of `Mar 2026` (57.6px measured).
+_DATE_TICKFORMATSTOPS = ({"dtickrange": [2419200000, "M12"], "value": "%b '%y"},)
+
+
+def _is_polar(fig: go.Figure) -> bool:
+    return any(getattr(trace, "type", "").endswith("polar") for trace in fig.data)
+
+
+def _chart_key(size: str, name: str) -> str:
+    """Container key whose ``st-key-`` class carries the CSS height token."""
+    if size not in CHART_SIZES:
+        raise ValueError(f"unknown chart size {size!r}; expected one of {CHART_SIZES}")
+    return f"it-chart-{size}-{name}"
+
+
+def chart_layout(fig: go.Figure, *, date_axis: bool = False) -> go.Figure:
+    """Strip the hardcoded height and apply the shared responsive layout."""
+    polar = _is_polar(fig)
+    has_legend = fig.layout.showlegend is not False and (len(fig.data) > 1 or polar)
+    fig.update_layout(
+        autosize=True,
+        height=None,
+        margin={
+            "l": 24 if polar else 36,
+            "r": 24 if polar else 12,
+            "t": 24,
+            "b": 64 if has_legend else 40,
+        },
+        legend={"orientation": "h", "yanchor": "top", "y": -0.24, "x": 0, "xanchor": "left"},
+    )
+    if not polar:
+        fig.update_xaxes(automargin=True)
+        fig.update_yaxes(automargin=True)
+        if date_axis:
+            fig.update_xaxes(tickformatstops=_DATE_TICKFORMATSTOPS)
+    return fig
+
+
+def plotly_chart(fig: go.Figure, name: str, *, size: str = "tall", date_axis: bool = False) -> None:
+    """Render ``fig`` with mobile-friendly defaults and a CSS-driven height.
+
+    Streamlit renders server-side and cannot see the viewport, so the figure
+    carries no height of its own: ``autosize`` makes Plotly measure the wrapper
+    box, whose height comes from ``--it-chart-h`` and flips at the 720px
+    breakpoint. Plotly reflows the SVG live on resize.
+
+    ``size`` picks one of :data:`CHART_SIZES`; ``date_axis`` shortens month-level
+    tick labels; ``name`` only has to be unique within a page.
+    """
+    key = _chart_key(size, name)
+    chart_layout(fig, date_axis=date_axis)
+    with st.container(key=key):
+        st.plotly_chart(fig, width="stretch", height="stretch", config=PLOT_CONFIG)
 
 
 def mini_metric(label: str, value: str, unit: str = "", sub: str = "") -> None:
