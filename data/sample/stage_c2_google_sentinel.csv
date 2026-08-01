@@ -1,0 +1,3 @@
+title,start_time,end_time,description,exercise_title,superset_id,exercise_notes,set_index,set_type,weight_kg,weight_lbs,reps,distance_km,distance_miles,duration_seconds,rpe
+Stage C2 Google Sentinel,"02 Mar 2026, 09:00","02 Mar 2026, 09:15",synthetic-only,Sentinel Row,,,0,warmup,15.00,33.07,8,,,,
+Stage C2 Google Sentinel,"02 Mar 2026, 09:00","02 Mar 2026, 09:15",synthetic-only,Sentinel Row,,,1,normal,40.00,88.18,6,,,,

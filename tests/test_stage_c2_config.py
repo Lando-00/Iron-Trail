@@ -11,6 +11,7 @@ def _base() -> dict[str, str]:
         "IRONTRAIL_GOOGLE_AUTH_ENABLED": "false",
         "IRONTRAIL_GOOGLE_CLIENT_ID": "",
         "IRONTRAIL_GOOGLE_CLIENT_SECRET": "",
+        "IRONTRAIL_STAGE_C2_PATCH_MODE": "false",
         "IRONTRAIL_MAX_USERS": "1",
     }
 
@@ -23,6 +24,12 @@ def test_google_enabled_requires_complete_web_client_credentials() -> None:
     config = _base()
     config["IRONTRAIL_GOOGLE_AUTH_ENABLED"] = "true"
 
+    with pytest.raises(ValueError, match="PATCH_MODE"):
+        validate_config(config)
+
+    config["IRONTRAIL_STAGE_C2_PATCH_MODE"] = "true"
+    config["SERVICE_WEB_IMAGE_NAME"] = "example.azurecr.io/irontrail/web:current"
+    config["WEB_URL"] = "https://example.azurecontainerapps.io"
     with pytest.raises(ValueError, match="client ID"):
         validate_config(config)
 
@@ -31,6 +38,21 @@ def test_google_enabled_requires_complete_web_client_credentials() -> None:
         validate_config(config)
 
     config["IRONTRAIL_GOOGLE_CLIENT_SECRET"] = "private-client-secret"
+    validate_config(config)
+
+
+def test_stage_c2_patch_requires_live_metadata_during_aad_only_rollback() -> None:
+    config = _base()
+    config["IRONTRAIL_STAGE_C2_PATCH_MODE"] = "true"
+
+    with pytest.raises(ValueError, match="SERVICE_WEB_IMAGE_NAME"):
+        validate_config(config)
+
+    config["SERVICE_WEB_IMAGE_NAME"] = "example.azurecr.io/irontrail/web:current"
+    with pytest.raises(ValueError, match="WEB_URL"):
+        validate_config(config)
+
+    config["WEB_URL"] = "https://example.azurecontainerapps.io"
     validate_config(config)
 
 

@@ -1,0 +1,3 @@
+title,start_time,end_time,description,exercise_title,superset_id,exercise_notes,set_index,set_type,weight_kg,weight_lbs,reps,distance_km,distance_miles,duration_seconds,rpe
+Stage C2 Owner Sentinel,"01 Mar 2026, 09:00","01 Mar 2026, 09:15",synthetic-only,Sentinel Squat,,,0,warmup,20.00,44.09,8,,,,
+Stage C2 Owner Sentinel,"01 Mar 2026, 09:00","01 Mar 2026, 09:15",synthetic-only,Sentinel Squat,,,1,normal,50.00,110.23,5,,,,
