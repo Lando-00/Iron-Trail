@@ -134,20 +134,17 @@ ton_val, ton_unit = fmt_kg(stats["tonnage_kg"])
 with c1:
     ui.mini_metric("Workouts", f"{stats['workouts']}")
     if len(workouts_per_week) >= 4:
-        st.plotly_chart(ui.sparkline(workouts_per_week.values, theme.COLORS["accent_blue"]),
-                        use_container_width=True, config={"displayModeBar": False})
+        ui.sparkline_svg(workouts_per_week.values, theme.COLORS["accent_blue"])
 
 with c2:
     ui.mini_metric("Tonnage", ton_val, ton_unit)
     if len(weekly) >= 4:
-        st.plotly_chart(ui.sparkline(weekly["tonnage"].values, theme.COLORS["accent_gold"]),
-                        use_container_width=True, config={"displayModeBar": False})
+        ui.sparkline_svg(weekly["tonnage"].values, theme.COLORS["accent_gold"])
 
 with c3:
     ui.mini_metric("Training time", f"{stats['training_hours']:.1f}", "h")
     if len(durations) >= 4:
-        st.plotly_chart(ui.sparkline(durations.values, theme.COLORS["accent_blue"]),
-                        use_container_width=True, config={"displayModeBar": False})
+        ui.sparkline_svg(durations.values, theme.COLORS["accent_blue"])
 
 with c4:
     ui.mini_metric("Current streak", f"{stats['current_streak']}", "d")
