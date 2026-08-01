@@ -41,6 +41,33 @@ def auth_providers(environ: Mapping[str, str] | None = None) -> tuple[str, ...]:
     return providers or ("aad",)
 
 
+def env_bool(
+    name: str,
+    default: bool,
+    *,
+    environ: Mapping[str, str] | None = None,
+) -> bool:
+    env = environ or os.environ
+    raw = env.get(name)
+    if raw is None:
+        return default
+    value = raw.strip().lower()
+    if value in {"true", "1", "yes", "on"}:
+        return True
+    if value in {"false", "0", "no", "off"}:
+        return False
+    raise ConfigurationError(f"{name} must be a boolean")
+
+
+def auto_persist_uploads(environ: Mapping[str, str] | None = None) -> bool:
+    """Whether a hosted upload is saved to the user's single slot automatically.
+
+    Set ``IRONTRAIL_AUTO_PERSIST_UPLOADS=false`` to restore the original
+    explicit opt-in flow without a code change.
+    """
+    return env_bool("IRONTRAIL_AUTO_PERSIST_UPLOADS", True, environ=environ)
+
+
 def env_int(
     name: str,
     default: int,
