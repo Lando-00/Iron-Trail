@@ -109,8 +109,9 @@ if show_forecast:
             hoverinfo="skip", name="Forecast CI", showlegend=False,
         )
 
-fig.update_layout(height=440, xaxis_title="Date", yaxis_title="e1RM (kg)")
-st.plotly_chart(fig, use_container_width=True)
+fig.update_layout(xaxis_title="Date")
+st.caption("e1RM in kg — estimated one-rep max per session.")
+ui.plotly_chart(fig, "e1rm", size="tall", date_axis=True)
 
 first = session_data["e1rm_kg"].iloc[0]
 last = session_data["e1rm_kg"].iloc[-1]

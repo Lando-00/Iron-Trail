@@ -89,7 +89,6 @@ else:
             ),
         ))
     fig.update_layout(
-        height=320,
         xaxis=dict(title="", range=[axis_start, axis_end]),
         yaxis=dict(
             tickmode="array",
@@ -99,7 +98,7 @@ else:
             title="",
         ),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    ui.plotly_chart(fig, "calendar", size="standard", date_axis=True)
 
 ui.section_title("Archetype distribution")
 
@@ -112,8 +111,8 @@ fig2 = go.Figure(go.Bar(
     marker=dict(color=dist["color"]),
     hovertemplate="%{x}: %{y} sessions<extra></extra>",
 ))
-fig2.update_layout(height=260, yaxis_title="Sessions", xaxis_title="")
-st.plotly_chart(fig2, use_container_width=True)
+fig2.update_layout(yaxis_title="Sessions", xaxis_title="")
+ui.plotly_chart(fig2, "archetypes", size="compact")
 
 ui.section_title("Time of day")
 
@@ -127,12 +126,11 @@ else:
         hovertemplate="%{x}:00 — %{y} workouts<extra></extra>",
     ))
     fig3.update_layout(
-        height=260,
         xaxis=dict(title="Hour of day (workout start)", dtick=1, range=[-0.5, 23.5]),
         yaxis_title="Workouts",
         bargap=0.12,
     )
-    st.plotly_chart(fig3, use_container_width=True)
+    ui.plotly_chart(fig3, "timeofday", size="compact")
 
     peak_hour = int(tod.sort_values("count", ascending=False).iloc[0]["hour"])
     bucket = (
