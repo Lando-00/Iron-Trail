@@ -12,8 +12,21 @@ from the structured summary, the LLM only writes prose around them.
 """
 from __future__ import annotations
 
+import html
 from datetime import datetime
 from typing import Any
+
+
+def _safe(value: Any) -> str:
+    """Neutralise raw HTML in a user-controlled string.
+
+    Exercise and workout names come straight from an uploaded CSV. They land in
+    Markdown that is rendered to a PDF (python-markdown passes raw HTML
+    through), written into vault notes, and shown in the app, so a name like
+    ``<img src="http://attacker/x">`` would otherwise become a live tag.
+    Escaping here keeps it visible as text everywhere.
+    """
+    return html.escape(str(value), quote=False)
 
 
 def _yaml_frontmatter(data: dict[str, Any]) -> str:
@@ -76,7 +89,7 @@ def _stats_block_weekly(summary: dict) -> str:
         lines.append("**Top lifts this week (e1RM):**")
         lines.append("")
         for entry in summary["exercise_top_e1rm"][:8]:
-            line = f"- {entry['exercise']} — {entry['e1rm_kg']:.1f} kg"
+            line = f"- {_safe(entry['exercise'])} — {entry['e1rm_kg']:.1f} kg"
             if entry.get("delta_kg") is not None:
                 line += f"  ({_fmt_delta_kg(entry['delta_kg'])} vs prior week)"
             lines.append(line)
@@ -89,7 +102,7 @@ def _stats_block_weekly(summary: dict) -> str:
         lines.append("")
         for p in plateaus[:5]:
             lines.append(
-                f"- _{p['status']}_ — {p['exercise']} "
+                f"- _{_safe(p['status'])}_ — {_safe(p['exercise'])} "
                 f"(current {p['current_e1rm_kg']:.1f} kg / peak {p['peak_e1rm_kg']:.1f} kg, "
                 f"{p['days_since_pr']} d since PR)"
             )
@@ -117,7 +130,7 @@ def _stats_block_monthly(summary: dict) -> str:
             ch = t["change_kg"]
             sign = "+" if ch >= 0 else ""
             lines.append(
-                f"- {t['exercise']} — {t['start_e1rm_kg']:.1f} kg → "
+                f"- {_safe(t['exercise'])} — {t['start_e1rm_kg']:.1f} kg → "
                 f"{t['end_e1rm_kg']:.1f} kg  ({sign}{ch:.1f} kg)"
             )
 
@@ -128,7 +141,7 @@ def _stats_block_monthly(summary: dict) -> str:
         lines.append("")
         for p in plateaus[:5]:
             lines.append(
-                f"- _{p['status']}_ — {p['exercise']} "
+                f"- _{_safe(p['status'])}_ — {_safe(p['exercise'])} "
                 f"(current {p['current_e1rm_kg']:.1f} kg / peak {p['peak_e1rm_kg']:.1f} kg)"
             )
 
