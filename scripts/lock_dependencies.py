@@ -79,7 +79,9 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         candidate = Path(tmp) / "requirements-cloud.lock"
         _compile(candidate)
-        if candidate.read_text(encoding="utf-8") != LOCKFILE.read_text(encoding="utf-8"):
+        # Compare content, not line endings: a Windows checkout may hold CRLF.
+        current = LOCKFILE.read_text(encoding="utf-8").splitlines()
+        if candidate.read_text(encoding="utf-8").splitlines() != current:
             print(
                 "requirements-cloud.lock is out of date — "
                 "run python scripts/lock_dependencies.py",
