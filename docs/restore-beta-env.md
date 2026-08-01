@@ -69,6 +69,9 @@ privilege.
 > assignments as a what-if rejection. This one is on the *data plane* for a
 > human, is not part of the Bicep template, and will not appear in an
 > infrastructure what-if — but record it as a deliberate, reversible act.
+>
+> **This is drift.** The role assignment should live in Bicep, not be applied
+> by hand. Tracked as gap #1 in [`infrastructure-backlog.md`](./infrastructure-backlog.md).
 
 ```powershell
 $sub = "de3679a8-d52d-42bd-9d7c-f7bed44ffc6f"
