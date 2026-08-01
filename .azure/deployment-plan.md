@@ -1,6 +1,7 @@
 # IronTrail Azure Deployment Plan
 
-> **Status:** Deployed — Stage C2 provider-only
+> **Status:** Deployed — Stage C2 provider-only, five-user ceiling, zero active
+> invites. Canary enrollment parked pending a beta tester (2026-08-01).
 
 Generated: 2026-07-11  
 Last verified: 2026-07-25
@@ -1004,7 +1005,12 @@ Autopilot must stop before:
 - [x] Accept Google Cloud Platform terms and create the dedicated OAuth client.
 - [x] Run complete `azure-validate` checks with real private Google values.
 - [x] Deploy provider-only mode at one user and prove the unknown-user gate.
-- [ ] Enroll the retained canary with a single private 72-hour invite.
+- [x] Restore the lost private AZD environment and apply the five-user ceiling
+  (2026-08-01). Capacity only — zero invites were generated.
+- [x] Declare the owner Key Vault grant in IaC instead of a manual assignment.
+- [ ] **Parked pending a beta tester** — generate one private 72-hour invite and
+  enroll the Google canary. Deliberately not issued: an unused code is standing
+  risk, and the ceiling already provides the capacity.
 - [ ] Complete live two-user isolation and suspend/restore acceptance.
 - [ ] Leave zero active invites, update evidence, commit, and push without
   merging.
@@ -1170,7 +1176,20 @@ requests. No retry or further model request was sent.
 
 ## 17. Next Step
 
-Apply the approved five-user ceiling with the narrow Stage C2 patch, then
-generate exactly one private 72-hour invite and enroll the retained Google
-canary. Until the full isolation and suspension gate passes, issue no external
-tester invitation — the ceiling grants capacity, not access.
+**Parked.** The five-user ceiling, the declared Key Vault grant, and the merged
+UI/theme work are live as of 2026-08-01, with **zero active invites**. The beta
+is resting in an owner-only state and needs no further action to stay safe.
+
+Resume when a beta tester is ready:
+
+1. Generate exactly one private 72-hour invite and enroll the Google canary.
+2. Prove list/load/cache/export/delete/session isolation using
+   `data/sample/stage_c2_owner_sentinel.csv` and
+   `data/sample/stage_c2_google_sentinel.csv` in separate Microsoft and Google
+   sessions.
+3. Suspend the canary, prove denial after the bounded cache window, restore
+   without a new invite, and prove retained data is unchanged.
+4. Clean the synthetic data, leave zero unused invites, and record evidence.
+
+No external tester invitation until steps 2 and 3 pass. The ceiling grants
+capacity, not access.
