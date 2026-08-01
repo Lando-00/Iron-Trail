@@ -35,6 +35,16 @@ param ownerObjectId string
   'false'
   'true'
 ])
+@description('Grant the owner Key Vault Secrets User for break-glass recovery.')
+param grantOwnerKeyVaultAccess string = 'false'
+
+@description('Current deployed image retained when reconciling an existing beta.')
+param currentContainerImage string = ''
+
+@allowed([
+  'false'
+  'true'
+])
 @description('Whether the verified login landing page may accept anonymous requests.')
 param authReady string
 
@@ -263,13 +273,27 @@ module keyVault 'br/public:avm/res/key-vault/vault:0.13.3' = {
     location: location
     name: keyVaultName
     publicNetworkAccess: 'Enabled'
-    roleAssignments: [
-      {
-        principalId: managedIdentity.outputs.principalId
-        principalType: 'ServicePrincipal'
-        roleDefinitionIdOrName: keyVaultSecretsUserRoleId
-      }
-    ]
+    roleAssignments: concat(
+      [
+        {
+          principalId: managedIdentity.outputs.principalId
+          principalType: 'ServicePrincipal'
+          roleDefinitionIdOrName: keyVaultSecretsUserRoleId
+        }
+      ],
+      // Break-glass: the vault uses RBAC, so subscription Owner alone cannot
+      // read these secrets. Declaring the grant keeps it auditable instead of
+      // being applied by hand during a recovery.
+      toLower(grantOwnerKeyVaultAccess) == 'true'
+        ? [
+            {
+              principalId: ownerObjectId
+              principalType: 'User'
+              roleDefinitionIdOrName: keyVaultSecretsUserRoleId
+            }
+          ]
+        : []
+    )
     secrets: concat([
       {
         contentType: 'Container Apps Easy Auth client secret'
@@ -458,7 +482,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.23.0' = {
             value: tableEndpoint
           }
         ]
-        image: placeholderImage
+        image: currentContainerImage == '' ? placeholderImage : currentContainerImage
         name: 'web'
         probes: [
           {

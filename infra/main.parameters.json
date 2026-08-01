@@ -38,6 +38,12 @@
     "googleAuthEnabled": {
       "value": "${IRONTRAIL_GOOGLE_AUTH_ENABLED}"
     },
+    "stageC2PatchMode": {
+      "value": "${IRONTRAIL_STAGE_C2_PATCH_MODE}"
+    },
+    "grantOwnerKeyVaultAccess": {
+      "value": "${IRONTRAIL_GRANT_OWNER_KV_ACCESS=false}"
+    },
     "googleClientId": {
       "value": "${IRONTRAIL_GOOGLE_CLIENT_ID}"
     },
@@ -46,6 +52,12 @@
     },
     "maxUsers": {
       "value": "${IRONTRAIL_MAX_USERS}"
+    },
+    "currentContainerImage": {
+      "value": "${SERVICE_WEB_IMAGE_NAME}"
+    },
+    "currentWebUrl": {
+      "value": "${WEB_URL}"
     },
     "monthlyBudgetEur": {
       "value": 25

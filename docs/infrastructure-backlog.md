@@ -5,13 +5,13 @@ proposed change, and why it is not already done.
 
 ---
 
-## 1. Owner Key Vault access is not in IaC *(open)*
+## 1. Owner Key Vault access is not in IaC *(implemented 2026-08-01, not yet applied)*
 
 **Found:** 2026-08-01, while restoring the lost `beta` AZD environment.
 
 ### Evidence
 
-`infra/modules/application.bicep:269-274` grants Key Vault access to exactly one
+`infra/modules/application.bicep` granted Key Vault access to exactly one
 principal — the workload's managed identity:
 
 ```bicep
@@ -24,9 +24,9 @@ roleAssignments: [
 ]
 ```
 
-No human principal is granted anything. Because the vault uses RBAC
+No human principal was granted anything. Because the vault uses RBAC
 (`enableRbacAuthorization: true`), subscription **Owner** does *not* confer
-data-plane access, so the owner reading their own secrets gets:
+data-plane access, so the owner reading their own secrets got:
 
 ```
 (Forbidden) Caller is not authorized to perform action on resource.
@@ -34,72 +34,85 @@ Action: 'Microsoft.KeyVault/vaults/secrets/readMetadata/action'
 Assignment: (not found)
 ```
 
-Recovering the environment therefore required a **manual, undocumented,
-out-of-band** `az role assignment create`. That is drift: the deployed access
-model no longer matches the template, and nothing in the repo records it.
+Recovering the environment therefore required a **manual, out-of-band**
+`az role assignment create` — drift the templates knew nothing about.
 
-### Why it matters
+### What was implemented
 
-- **Drift** — a redeploy will not recreate the assignment, so the next person
-  hits the same wall and improvises again.
-- **Auditability** — the Stage C2 plan treats unapproved role assignments as a
-  what-if rejection, yet this one is invisible to `what-if` because it was made
-  by hand on the data plane.
-- **Recovery** — Key Vault is the *only* place the beta secrets survive. If
-  nobody can read it, the fallback is rotating live credentials, which causes
-  an auth outage.
+A `grantOwnerKeyVaultAccess` flag, defaulting to `'false'`, wired through
+**both** deployment paths:
 
-### Proposed change
+| File | Change |
+|---|---|
+| `infra/main.bicep` | New param; passed to both modules |
+| `infra/modules/application.bicep` | Appends the owner to the vault module's `roleAssignments` |
+| `infra/modules/stage_c2_patch.bicep` | Standalone `Microsoft.Authorization/roleAssignments` — this module treats the vault as `existing`, so it cannot use the vault module's array |
+| `infra/main.parameters.json` | `IRONTRAIL_GRANT_OWNER_KV_ACCESS`, defaulting to `false` |
+| `scripts/validate_stage_c2_whatif.py` | Narrow allowlist entry |
+| `tests/test_stage_c_iac.py`, `tests/test_stage_c2_whatif.py` | Coverage |
 
-`ownerObjectId` is already a parameter, so the addition is small. Gate it so it
-is explicit and reviewable:
+Two details worth keeping:
 
-```bicep
-@description('Grant the owner data-plane read on Key Vault for break-glass recovery.')
-param grantOwnerKeyVaultAccess bool = false
+- **String, not `bool`.** AZD substitutes environment values as strings, so a
+  `bool` param would receive `"false"` and fail ARM type validation. This
+  matches the existing `stageC2PatchMode` convention.
+- **The what-if exemption is pinned.** It permits only `Create`, only the
+  `Key Vault Secrets User` role ID, and only the expected owner object ID —
+  so it cannot be widened into arbitrary RBAC. Negative tests cover a
+  different principal, a broader role (Key Vault Administrator), `Delete`,
+  `Modify`, and a missing expected owner.
 
-// inside the Key Vault module's roleAssignments:
-roleAssignments: concat(
-  [
-    {
-      principalId: managedIdentity.outputs.principalId
-      principalType: 'ServicePrincipal'
-      roleDefinitionIdOrName: keyVaultSecretsUserRoleId
-    }
-  ],
-  grantOwnerKeyVaultAccess ? [
-    {
-      principalId: ownerObjectId
-      principalType: 'User'
-      roleDefinitionIdOrName: keyVaultSecretsUserRoleId
-    }
-  ] : []
-)
+### ⚠️ Required migration step before the next provision
+
+The manual assignment created during recovery has a **random** name:
+
+```
+308855db-24a3-4a70-afd2-8743390715d8   Key Vault Secrets User   User   9f2b1274-…
 ```
 
-Then `IRONTRAIL_GRANT_OWNER_KV_ACCESS` in `main.parameters.json`, and extend
-`scripts/validate_stage_c2_whatif.py` to allow exactly this one role assignment
-when the flag is on — so it stays fail-closed.
+Bicep uses a **deterministic** `guid(vaultId, ownerObjectId, roleId)` name.
+Azure treats a role assignment as unique per *(scope, principal, role)*, so
+creating the declared one while the manual one still exists returns
+**`RoleAssignmentExists` (409)** and the deployment fails.
 
-### Open design question
+Delete the manual assignment first — the template will recreate it:
 
-Standing human read access to every secret is convenient but weakens the blast
-radius argument. Three options:
+```powershell
+$sub = "de3679a8-d52d-42bd-9d7c-f7bed44ffc6f"
+$kv  = "kv-irontrail-t5padq"
+$scope = "/subscriptions/$sub/resourceGroups/rg-IronTrail/providers/Microsoft.KeyVault/vaults/$kv"
+
+az role assignment delete --ids `
+  "$scope/providers/Microsoft.Authorization/roleAssignments/308855db-24a3-4a70-afd2-8743390715d8"
+```
+
+Then set `IRONTRAIL_GRANT_OWNER_KV_ACCESS=true` and provision. Verify
+afterwards that exactly two assignments exist on the vault (the UAMI and the
+owner) and that the owner's name is now the deterministic GUID.
+
+> **Note:** `azd provision --preview` does **not** render role assignments in
+> its resource summary — it was verified instead by inspecting the compiled ARM
+> template. Do not read the preview's silence as "no RBAC change".
+
+### Design decision
+
+Standing human read access weakens least privilege, so three options were
+considered:
 
 | Option | Pro | Con |
 |---|---|---|
-| **A.** Permanent `Key Vault Secrets User` for the owner, flag-gated | Simple, in IaC, survives redeploy | Standing access to all secrets |
-| **B.** Break-glass only — flag normally `false`, flipped during recovery | Least standing privilege, still in IaC | Requires a provision to recover, and provision needs the secrets → **circular** |
-| **C.** Entra PIM / just-in-time elevation | Best practice | Needs a P2 licence; out of scope for a €25/mo beta |
+| **A.** Permanent owner grant, flag-gated | Simple, in IaC, survives redeploy | Standing access to all secrets |
+| **B.** Break-glass only — flag normally `false`, flipped during recovery | Least standing privilege | **Circular** — provisioning is what you need the secrets *for* |
+| **C.** Entra PIM / just-in-time | Best practice | Needs a P2 licence; out of scope for a €25/mo beta |
 
-**Recommendation: A, flag-gated and defaulted `false`, enabled for this beta.**
-Option B is circular — you cannot provision your way out of not being able to
-read the secrets you need in order to provision. The owner is already
-subscription Owner and can self-grant at any time, so A grants no privilege
-they lack; it just makes the access *declared and auditable* instead of
-improvised.
+**Chosen: A.** Option B is the trap we just fell into — you cannot provision
+your way out of being unable to read the secrets that provisioning requires.
+The owner is already subscription Owner and can self-grant at any time, so this
+adds no privilege they lack; it makes the access *declared and auditable*
+instead of improvised. The flag still defaults to `'false'`, so nothing is
+granted unless an environment opts in.
 
-### Also fix at the same time
+### Still open
 
 - **No backup of the non-secret AZD keys.** Losing `.azure/beta/.env` cost an
   hour of recovery. The values are reconstructible from the live resources (see

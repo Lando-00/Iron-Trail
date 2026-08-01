@@ -38,6 +38,17 @@ param ownerObjectId string
   'false'
   'true'
 ])
+@description('''Grant the owner Key Vault Secrets User for break-glass recovery.
+Without this the vault's RBAC leaves no human able to read the beta secrets:
+subscription Owner does not confer data-plane access, so recovering a lost AZD
+environment requires an out-of-band role assignment that drifts from IaC.
+Declared as a string to match the other AZD-substituted flags.''')
+param grantOwnerKeyVaultAccess string = 'false'
+
+@allowed([
+  'false'
+  'true'
+])
 @description('Whether the verified login landing page may accept anonymous requests.')
 param authReady string = 'false'
 
@@ -47,6 +58,13 @@ param authReady string = 'false'
 ])
 @description('Whether Google is configured as an Easy Auth identity provider.')
 param googleAuthEnabled string = 'false'
+
+@allowed([
+  'false'
+  'true'
+])
+@description('Whether an existing beta must use the narrow Stage C2 patch path.')
+param stageC2PatchMode string = 'false'
 
 @description('Google OAuth web client ID.')
 @minLength(1)
@@ -66,14 +84,22 @@ param googleClientSecret string = ''
 @description('Maximum number of active beta members, including the owner.')
 param maxUsers string = '1'
 
+@description('Current deployed Container App image used by the Stage C2 patch.')
+param currentContainerImage string = ''
+
+@description('Current deployed Container App URL used by the Stage C2 patch.')
+param currentWebUrl string = ''
+
 @description('Monthly Azure budget in EUR for this resource group.')
 param monthlyBudgetEur int = 25
+
+var stageC2PatchEnabled = toLower(stageC2PatchMode) == 'true' || toLower(googleAuthEnabled) == 'true'
 
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' existing = {
   name: resourceGroupName
 }
 
-module application './modules/application.bicep' = {
+module application './modules/application.bicep' = if (!stageC2PatchEnabled) {
   name: 'irontrail-application-${environmentName}'
   scope: resourceGroup
   params: {
@@ -91,10 +117,36 @@ module application './modules/application.bicep' = {
     maxUsers: maxUsers
     modelDeploymentName: modelDeploymentName
     ownerObjectId: ownerObjectId
+    grantOwnerKeyVaultAccess: grantOwnerKeyVaultAccess
+    currentContainerImage: currentContainerImage
   }
 }
 
-module budget 'br/public:avm/res/consumption/budget/rg-scope:0.1.0' = {
+module stageC2Patch './modules/stage_c2_patch.bicep' = if (stageC2PatchEnabled) {
+  name: 'irontrail-stage-c2-patch-${environmentName}'
+  scope: resourceGroup
+  params: {
+    aadClientId: aadClientId
+    authReady: authReady
+    betaRevealSeed: betaRevealSeed
+    environmentName: environmentName
+    foundryAccountName: foundryAccountName
+    googleAuthEnabled: googleAuthEnabled
+    googleClientId: googleClientId
+    googleClientSecret: googleClientSecret
+    location: location
+    maxUsers: maxUsers
+    modelDeploymentName: modelDeploymentName
+    ownerObjectId: ownerObjectId
+    grantOwnerKeyVaultAccess: grantOwnerKeyVaultAccess
+    currentContainerImage: currentContainerImage
+    currentWebUrl: currentWebUrl
+  }
+}
+
+// Stage C2 preserves the existing budget; budget changes require a separate
+// approved infrastructure rollout rather than widening this auth-only patch.
+module budget 'br/public:avm/res/consumption/budget/rg-scope:0.1.0' = if (!stageC2PatchEnabled) {
   name: 'irontrail-budget-${environmentName}'
   scope: resourceGroup
   params: {
@@ -114,12 +166,12 @@ module budget 'br/public:avm/res/consumption/budget/rg-scope:0.1.0' = {
 }
 
 output AZURE_RESOURCE_GROUP string = resourceGroup.name
-output AZURE_CONTAINER_REGISTRY_ENDPOINT string = application.outputs.containerRegistryEndpoint
-output AZURE_CONTAINER_APPS_ENVIRONMENT_NAME string = application.outputs.containerAppsEnvironmentName
-output SERVICE_WEB_NAME string = application.outputs.containerAppName
+output AZURE_CONTAINER_REGISTRY_ENDPOINT string = stageC2PatchEnabled ? stageC2Patch!.outputs.containerRegistryEndpoint : application!.outputs.containerRegistryEndpoint
+output AZURE_CONTAINER_APPS_ENVIRONMENT_NAME string = stageC2PatchEnabled ? stageC2Patch!.outputs.containerAppsEnvironmentName : application!.outputs.containerAppsEnvironmentName
+output SERVICE_WEB_NAME string = stageC2PatchEnabled ? stageC2Patch!.outputs.containerAppName : application!.outputs.containerAppName
 output SERVICE_WEB_RESOURCE_GROUP_NAME string = resourceGroup.name
-output WEB_URL string = application.outputs.webUrl
-output IRONTRAIL_STORAGE_BLOB_URL string = application.outputs.storageBlobUrl
-output IRONTRAIL_STORAGE_TABLE_URL string = application.outputs.storageTableUrl
-output IRONTRAIL_KEY_VAULT_NAME string = application.outputs.keyVaultName
-output IRONTRAIL_MANAGED_IDENTITY_CLIENT_ID string = application.outputs.managedIdentityClientId
+output WEB_URL string = stageC2PatchEnabled ? stageC2Patch!.outputs.webUrl : application!.outputs.webUrl
+output IRONTRAIL_STORAGE_BLOB_URL string = stageC2PatchEnabled ? stageC2Patch!.outputs.storageBlobUrl : application!.outputs.storageBlobUrl
+output IRONTRAIL_STORAGE_TABLE_URL string = stageC2PatchEnabled ? stageC2Patch!.outputs.storageTableUrl : application!.outputs.storageTableUrl
+output IRONTRAIL_KEY_VAULT_NAME string = stageC2PatchEnabled ? stageC2Patch!.outputs.keyVaultName : application!.outputs.keyVaultName
+output IRONTRAIL_MANAGED_IDENTITY_CLIENT_ID string = stageC2PatchEnabled ? stageC2Patch!.outputs.managedIdentityClientId : application!.outputs.managedIdentityClientId
