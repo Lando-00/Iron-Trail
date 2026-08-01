@@ -572,9 +572,36 @@ footer { display: none !important; }
 """
 
 
+THEME_QUERY_PARAM = "theme"
+_THEME_STATE_KEY = "it_theme"
+
+
+def active_palette() -> str:
+    """The palette for this session: URL first, then session state, then default."""
+    requested = st.query_params.get(THEME_QUERY_PARAM)
+    if requested not in theme.PALETTES:
+        requested = st.session_state.get(_THEME_STATE_KEY)
+    if requested not in theme.PALETTES:
+        requested = theme.DEFAULT_PALETTE
+    return requested
+
+
+def select_palette(name: str) -> None:
+    """Persist a palette choice for this session and in a shareable URL."""
+    if name not in theme.PALETTES:
+        name = theme.DEFAULT_PALETTE
+    st.session_state[_THEME_STATE_KEY] = name
+    if name == theme.DEFAULT_PALETTE:
+        st.query_params.pop(THEME_QUERY_PARAM, None)
+    else:
+        st.query_params[THEME_QUERY_PARAM] = name
+
+
 def setup_page(title: str, icon: str, *, layout: str = "wide") -> None:
     """Page-config + theme + CSS in one call. Call once at the top of every page."""
     st.set_page_config(page_title=title, page_icon=icon, layout=layout)
+    # Before anything builds a figure, so charts and CSS agree on the palette.
+    st.session_state[_THEME_STATE_KEY] = theme.apply_palette(active_palette())
     st.markdown(f"<style>\n{theme.css_variables()}\n</style>", unsafe_allow_html=True)
     st.markdown(_CSS, unsafe_allow_html=True)
     from .telemetry import configure_telemetry

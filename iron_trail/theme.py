@@ -41,6 +41,61 @@ COLORS = {
     "tint_green": "#a6e3b8",
 }
 
+DEFAULT_PALETTE = "dark_gold"
+
+#: Selectable palettes. Every one must keep `text_muted` at >= 4.5:1 against its
+#: own `bg` — `tests/test_theme_palettes.py` enforces it for all of them.
+PALETTES: dict[str, dict[str, str]] = {
+    "dark_gold": dict(COLORS),
+    # Pure black with brighter ink and accents, for daylight and for anyone who
+    # finds the default too low in contrast. Muted text is 9.06:1 here.
+    "high_contrast": {
+        **COLORS,
+        "bg": "#000000",
+        "surface": "rgba(255,255,255,0.07)",
+        "surface_strong": "rgba(255,255,255,0.12)",
+        "border": "rgba(255,255,255,0.22)",
+        "border_strong": "rgba(255,255,255,0.34)",
+        "text_primary": "#ffffff",
+        "text_secondary": "#c9c9d2",
+        "text_muted": "#b0b0ba",
+        "text_soft": "#e2e2e6",
+        "text_tab": "#e2e2e6",
+        "accent_gold": "#f2c65c",
+        "accent_blue": "#7db6ff",
+        "accent_red": "#ff8072",
+        "accent_green": "#74e295",
+        "accent_lavender": "#bba9ff",
+        "accent_peach": "#ffb877",
+        "accent_mint": "#74e295",
+        "tint_gold": "#f7dda0",
+        "tint_blue": "#c2dbff",
+        "tint_blue_soft": "#d3e5ff",
+        "tint_red": "#ffb9b0",
+        "tint_green": "#b3f0c6",
+    },
+    # True black so OLED panels switch pixels off, with the default accents.
+    "amoled": {
+        **COLORS,
+        "bg": "#000000",
+        "surface": "rgba(255,255,255,0.02)",
+        "surface_strong": "rgba(255,255,255,0.05)",
+        "border": "rgba(255,255,255,0.08)",
+        "border_strong": "rgba(255,255,255,0.16)",
+        "text_primary": "#f2f2f4",
+        "text_secondary": "#9a9aa3",
+        "text_muted": "#8d8d96",
+        "text_soft": "#c2c2c8",
+        "text_tab": "#c2c2c8",
+    },
+}
+
+PALETTE_LABELS = {
+    "dark_gold": "Dark gold (default)",
+    "high_contrast": "High contrast",
+    "amoled": "AMOLED black",
+}
+
 # Emitted as `--it-<name>` custom properties so the stylesheet in ui.py holds no
 # colour literals of its own and a palette swap is a single :root rewrite.
 CSS_COLOR_KEYS = (
@@ -94,29 +149,40 @@ def css_variables(colors: dict[str, str] | None = None) -> str:
     return f":root {{\n{body}\n}}"
 
 
-CHART_CYCLE = [
-    COLORS["accent_gold"],
-    COLORS["accent_blue"],
-    COLORS["accent_lavender"],
-    COLORS["accent_red"],
-    COLORS["accent_mint"],
-    COLORS["accent_peach"],
-]
+CHART_CYCLE: list[str] = []
+ARCHETYPE_COLORS: dict[str, str] = {}
+PLATEAU_COLORS: dict[str, str] = {}
 
-ARCHETYPE_COLORS = {
-    "Strength": COLORS["accent_gold"],
-    "Hypertrophy": COLORS["accent_blue"],
-    "Pump": COLORS["accent_lavender"],
-    "Quick": COLORS["accent_peach"],
-    "Mixed": COLORS["accent_mint"],
-}
 
-PLATEAU_COLORS = {
-    "fresh_pr": COLORS["accent_gold"],
-    "progressing": COLORS["accent_green"],
-    "plateaued": COLORS["accent_peach"],
-    "regressing": COLORS["accent_red"],
-}
+def _refresh_derived_colors() -> None:
+    """Rebuild the derived maps in place — pages hold references to them."""
+    CHART_CYCLE[:] = [
+        COLORS["accent_gold"],
+        COLORS["accent_blue"],
+        COLORS["accent_lavender"],
+        COLORS["accent_red"],
+        COLORS["accent_mint"],
+        COLORS["accent_peach"],
+    ]
+    ARCHETYPE_COLORS.clear()
+    ARCHETYPE_COLORS.update(
+        {
+            "Strength": COLORS["accent_gold"],
+            "Hypertrophy": COLORS["accent_blue"],
+            "Pump": COLORS["accent_lavender"],
+            "Quick": COLORS["accent_peach"],
+            "Mixed": COLORS["accent_mint"],
+        }
+    )
+    PLATEAU_COLORS.clear()
+    PLATEAU_COLORS.update(
+        {
+            "fresh_pr": COLORS["accent_gold"],
+            "progressing": COLORS["accent_green"],
+            "plateaued": COLORS["accent_peach"],
+            "regressing": COLORS["accent_red"],
+        }
+    )
 
 
 def _build_template() -> go.layout.Template:
@@ -175,4 +241,28 @@ def register_template() -> None:
     pio.templates.default = "irontrail"
 
 
+def apply_palette(name: str) -> str:
+    """Switch the active palette and rebuild everything derived from it.
+
+    ``COLORS`` and the derived maps are mutated in place because pages read
+    ``theme.COLORS[...]`` at render time, and the Plotly template is
+    re-registered so charts pick the new accents up.
+
+    Note this is process-global state. The `:root` block is emitted per
+    response so the CSS side is always right for the session that asked for it,
+    but two concurrent sessions on different palettes can transiently trade
+    chart accent colours. Per-account theming would have to thread the palette
+    through every render call instead.
+    """
+    palette = PALETTES.get(name)
+    if palette is None:
+        name, palette = DEFAULT_PALETTE, PALETTES[DEFAULT_PALETTE]
+    COLORS.clear()
+    COLORS.update(palette)
+    _refresh_derived_colors()
+    register_template()
+    return name
+
+
+_refresh_derived_colors()
 register_template()
