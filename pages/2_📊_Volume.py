@@ -37,18 +37,14 @@ if weeks is not None:
     vol = vol[vol["week"] >= start_week]
 
 ui.section_title("Weekly tonnage by muscle")
+plot_vol = metrics.group_minor_muscles(vol)
 fig = px.bar(
-    vol, x="week", y="volume_kg", color="primary_muscle",
+    plot_vol, x="week", y="volume_kg", color="primary_muscle",
     labels={"week": "Week", "volume_kg": "Tonnage (kg)", "primary_muscle": "Muscle"},
     color_discrete_sequence=px.colors.qualitative.Vivid,
 )
-fig.update_layout(
-    barmode="stack",
-    height=460,
-    margin=dict(l=24, r=24, t=24, b=110),
-    legend=dict(orientation="h", y=-0.30, yanchor="top", x=0, xanchor="left"),
-)
-st.plotly_chart(fig, use_container_width=True)
+fig.update_layout(barmode="stack")
+ui.plotly_chart(fig, "tonnage", size="xtall", date_axis=True)
 
 ui.section_title("Push : Pull ratio")
 pp = metrics.weekly_push_pull(df)
@@ -74,8 +70,9 @@ else:
         fig2.add_hline(y=1.0, line=dict(color=theme.COLORS["text_muted"], width=1, dash="dash"),
                        annotation_text="1:1 balance", annotation_position="top right",
                        annotation_font=dict(color=theme.COLORS["text_secondary"]))
-        fig2.update_layout(height=320, xaxis_title="Week", yaxis_title="Pull ÷ Push volume")
-        st.plotly_chart(fig2, use_container_width=True)
+        fig2.update_layout(xaxis_title="Week")
+        st.caption("Pull ÷ Push volume per week — 1.0 is balanced.")
+        ui.plotly_chart(fig2, "pushpull", size="standard", date_axis=True)
 
         avg_ratio = plot_pp["push_pull_ratio"].mean()
         if 0.9 <= avg_ratio <= 1.3:
@@ -113,10 +110,9 @@ else:
     max_r = max(target_sets_per_week, float(radar["sets_per_week"].max())) * 1.15
     fig3.update_layout(
         polar=dict(radialaxis=dict(range=[0, max_r], showticklabels=True)),
-        height=460,
         showlegend=True,
     )
-    st.plotly_chart(fig3, use_container_width=True)
+    ui.plotly_chart(fig3, "radar", size="xtall")
 
     neglected = radar[radar["sets_per_week"] < 4].sort_values("sets_per_week")
     if not neglected.empty:

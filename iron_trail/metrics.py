@@ -108,6 +108,27 @@ def weekly_volume_by_muscle(df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def group_minor_muscles(
+    volume: pd.DataFrame, top_n: int = 6, other_label: str = "other"
+) -> pd.DataFrame:
+    """Collapse the long tail of muscles into a single ``other`` series.
+
+    The stacked tonnage chart legend measured 247x121 on a 358px-wide phone —
+    a third of the chart — because every mapped muscle got its own entry. The
+    ``top_n`` biggest muscles by total volume stay named; the rest are summed.
+    """
+    if volume.empty or volume["primary_muscle"].nunique() <= top_n:
+        return volume
+
+    totals = volume.groupby("primary_muscle")["volume_kg"].sum()
+    keep = set(totals.nlargest(top_n).index)
+    grouped = volume.copy()
+    grouped["primary_muscle"] = grouped["primary_muscle"].where(
+        grouped["primary_muscle"].isin(keep), other_label
+    )
+    return grouped.groupby(["week", "primary_muscle"], as_index=False)["volume_kg"].sum()
+
+
 def weekly_push_pull(df: pd.DataFrame) -> pd.DataFrame:
     rows = df[df["is_working"]].copy()
     if rows.empty:

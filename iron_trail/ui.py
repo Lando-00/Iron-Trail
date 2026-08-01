@@ -22,24 +22,24 @@ _CSS = """
 
 html, body, [class*="css"], .stApp {
     font-family: 'Inter Tight', system-ui, -apple-system, sans-serif;
-    color: #e7e7e9;
+    color: var(--it-text-primary);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
 
 .stApp {
     background:
-      radial-gradient(circle at 0% 0%, rgba(212, 168, 67, 0.05), transparent 38%),
-      radial-gradient(circle at 100% 0%, rgba(91, 156, 240, 0.045), transparent 38%),
-      radial-gradient(circle at 50% 100%, rgba(155, 135, 245, 0.03), transparent 50%),
-      #0a0a0c;
+      radial-gradient(circle at 0% 0%, rgba(var(--it-accent-gold-rgb), 0.05), transparent 38%),
+      radial-gradient(circle at 100% 0%, rgba(var(--it-accent-blue-rgb), 0.045), transparent 38%),
+      radial-gradient(circle at 50% 100%, rgba(var(--it-accent-lavender-rgb), 0.03), transparent 50%),
+      var(--it-bg);
 }
 
 /* Quotes page cards */
 .it-quote-card {
-    background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015));
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-left: 3px solid #d4a843;
+    background: linear-gradient(135deg, rgba(var(--it-overlay-rgb), 0.04), rgba(var(--it-overlay-rgb), 0.015));
+    border: 1px solid rgba(var(--it-overlay-rgb), 0.08);
+    border-left: 3px solid var(--it-accent-gold);
     border-radius: 12px;
     padding: 18px 22px;
     margin: 10px 0;
@@ -47,23 +47,23 @@ html, body, [class*="css"], .stApp {
 }
 .it-quote-card:hover {
     transform: translateX(2px);
-    border-left-color: #e8a05b;
+    border-left-color: var(--it-accent-peach);
 }
-.it-quote-card.cluster { border-left-color: #5b9cf0; }
-.it-quote-card.emotional { border-left-color: #e85a4f; }
-.it-quote-card.roast { border-left-color: #9b87f5; }
-.it-quote-card.emoji { border-left-color: #5dc77c; }
+.it-quote-card.cluster { border-left-color: var(--it-accent-blue); }
+.it-quote-card.emotional { border-left-color: var(--it-accent-red); }
+.it-quote-card.roast { border-left-color: var(--it-accent-lavender); }
+.it-quote-card.emoji { border-left-color: var(--it-accent-green); }
 
 .it-quote-text {
     font-family: 'Inter Tight', sans-serif;
     font-size: 17px;
-    color: #e7e7e9;
+    color: var(--it-text-primary);
     font-weight: 500;
     font-style: italic;
     line-height: 1.4;
 }
 .it-quote-meta {
-    color: #8a8a93;
+    color: var(--it-text-secondary);
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.12em;
@@ -77,9 +77,9 @@ html, body, [class*="css"], .stApp {
     margin-top: 4px;
 }
 .it-quote-variant {
-    background: rgba(91, 156, 240, 0.10);
-    border: 1px solid rgba(91, 156, 240, 0.25);
-    color: #b5cef5;
+    background: rgba(var(--it-accent-blue-rgb), 0.10);
+    border: 1px solid rgba(var(--it-accent-blue-rgb), 0.25);
+    color: var(--it-tint-blue-soft);
     padding: 4px 10px;
     border-radius: 999px;
     font-size: 12px;
@@ -88,29 +88,29 @@ html, body, [class*="css"], .stApp {
 
 /* Coach page — review card */
 .it-review-card {
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(var(--it-overlay-rgb), 0.02);
+    border: 1px solid rgba(var(--it-overlay-rgb), 0.08);
     border-radius: 14px;
     padding: 28px 36px;
     margin: 20px 0;
 }
 .it-review-card h1,
 .it-review-card h2,
-.it-review-card h3 { color: #e7e7e9; }
+.it-review-card h3 { color: var(--it-text-primary); }
 .it-review-card h2 {
-    color: #d4a843;
+    color: var(--it-accent-gold);
     font-size: 17px;
     margin-top: 24px;
-    border-bottom: 1px solid rgba(212, 168, 67, 0.18);
+    border-bottom: 1px solid rgba(var(--it-accent-gold-rgb), 0.18);
     padding-bottom: 8px;
 }
 
 .it-coach-empty {
-    border: 1px dashed rgba(255, 255, 255, 0.12);
+    border: 1px dashed rgba(var(--it-overlay-rgb), 0.12);
     border-radius: 14px;
     padding: 60px 24px;
     text-align: center;
-    color: #8a8a93;
+    color: var(--it-text-secondary);
 }
 
 /* Tabs — render as a real segmented control. Streamlit's default is small
@@ -124,74 +124,74 @@ html, body, [class*="css"], .stApp {
 [data-testid="stTab"] {
     min-height: 44px;
     padding: 9px 15px !important;
-    border: 1px solid rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(var(--it-overlay-rgb), 0.10);
     border-radius: 11px;
-    background: rgba(255, 255, 255, 0.028);
+    background: rgba(var(--it-overlay-rgb), 0.028);
     font-weight: 600;
     transition: border-color 0.18s, background 0.18s, color 0.18s;
 }
 [data-testid="stTab"],
-[data-testid="stTab"] * { color: #b9b9c2 !important; }
+[data-testid="stTab"] * { color: var(--it-text-tab) !important; }
 [data-testid="stTab"]:hover {
-    border-color: rgba(212, 168, 67, 0.45);
-    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(var(--it-accent-gold-rgb), 0.45);
+    background: rgba(var(--it-overlay-rgb), 0.05);
 }
-[data-testid="stTab"]:hover * { color: #e7e7e9 !important; }
+[data-testid="stTab"]:hover * { color: var(--it-text-primary) !important; }
 [data-testid="stTab"][aria-selected="true"] {
-    border-color: rgba(212, 168, 67, 0.75);
-    background: linear-gradient(135deg, rgba(212, 168, 67, 0.16), rgba(212, 168, 67, 0.05));
-    box-shadow: 0 4px 18px rgba(212, 168, 67, 0.12);
+    border-color: rgba(var(--it-accent-gold-rgb), 0.75);
+    background: linear-gradient(135deg, rgba(var(--it-accent-gold-rgb), 0.16), rgba(var(--it-accent-gold-rgb), 0.05));
+    box-shadow: 0 4px 18px rgba(var(--it-accent-gold-rgb), 0.12);
 }
-[data-testid="stTab"][aria-selected="true"] * { color: #d4a843 !important; }
+[data-testid="stTab"][aria-selected="true"] * { color: var(--it-accent-gold) !important; }
 /* Hide the default underline indicator — the pill carries the state now. */
 [data-testid="stTabs"] [data-baseweb="tab-highlight"],
 [data-testid="stTabs"] [data-baseweb="tab-border"] { display: none !important; }
 
 /* Suggested starter prompts for the Coach chat. */
 .it-chat-hint {
-    color: #8a8a93;
+    color: var(--it-text-secondary);
     font-size: 12.5px;
     margin: 2px 0 8px;
 }
 
 /* Hall of Fame highlight card (gold-glow inverse of lowlight) */
 .it-highlight {
-    background: linear-gradient(135deg, rgba(212, 168, 67, 0.07), rgba(212, 168, 67, 0.015));
-    border: 1px solid rgba(212, 168, 67, 0.30);
-    border-left: 3px solid #d4a843;
+    background: linear-gradient(135deg, rgba(var(--it-accent-gold-rgb), 0.07), rgba(var(--it-accent-gold-rgb), 0.015));
+    border: 1px solid rgba(var(--it-accent-gold-rgb), 0.30);
+    border-left: 3px solid var(--it-accent-gold);
     border-radius: 10px;
     padding: 14px 18px;
     margin: 8px 0;
-    box-shadow: 0 4px 18px rgba(212, 168, 67, 0.06);
+    box-shadow: 0 4px 18px rgba(var(--it-accent-gold-rgb), 0.06);
 }
 .it-highlight-date {
     font-family: 'JetBrains Mono', monospace;
-    color: #d4a843;
+    color: var(--it-accent-gold);
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.12em;
     font-weight: 700;
 }
-.it-highlight-title { color: #e7e7e9; font-weight: 600; margin-top: 4px; }
-.it-highlight-caption { color: #e6c887; font-style: italic; font-size: 13px; margin-top: 6px; }
+.it-highlight-title { color: var(--it-text-primary); font-weight: 600; margin-top: 4px; }
+.it-highlight-caption { color: var(--it-tint-gold); font-style: italic; font-size: 13px; margin-top: 6px; }
 .it-highlight-stats {
     font-family: 'JetBrains Mono', monospace;
-    color: #8a8a93;
+    color: var(--it-text-secondary);
     font-size: 11px;
     margin-top: 8px;
 }
 
 /* Sidebar */
 [data-testid="stSidebar"] {
-    background: rgba(10, 10, 12, 0.6);
+    background: rgba(var(--it-bg-rgb), 0.6);
     backdrop-filter: blur(20px);
-    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    border-right: 1px solid rgba(var(--it-overlay-rgb), 0.06);
 }
 
 /* Hero */
 .it-hero {
-    background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(135deg, rgba(var(--it-overlay-rgb), 0.04), rgba(var(--it-overlay-rgb), 0.02));
+    border: 1px solid rgba(var(--it-overlay-rgb), 0.08);
     border-radius: 18px;
     padding: 36px 36px 32px;
     margin-bottom: 28px;
@@ -205,7 +205,7 @@ html, body, [class*="css"], .stApp {
     top: -40%;
     right: -10%;
     width: 280px; height: 280px;
-    background: radial-gradient(circle, rgba(212,168,67,0.18), transparent 70%);
+    background: radial-gradient(circle, rgba(var(--it-accent-gold-rgb), 0.18), transparent 70%);
     filter: blur(40px);
     pointer-events: none;
 }
@@ -213,7 +213,7 @@ html, body, [class*="css"], .stApp {
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.20em;
-    color: #8a8a93;
+    color: var(--it-text-secondary);
     font-weight: 700;
 }
 .it-hero-value {
@@ -221,20 +221,20 @@ html, body, [class*="css"], .stApp {
     font-size: 72px;
     font-weight: 700;
     letter-spacing: -0.03em;
-    color: #e7e7e9;
+    color: var(--it-text-primary);
     line-height: 1.0;
     margin: 8px 0 4px;
     position: relative;
 }
 .it-hero-unit {
     font-size: 26px;
-    color: #7d7d86;
+    color: var(--it-text-muted);
     margin-left: 10px;
     font-weight: 500;
     letter-spacing: 0;
 }
 .it-hero-subtitle {
-    color: #8a8a93;
+    color: var(--it-text-secondary);
     font-size: 14px;
     margin-top: 14px;
     max-width: 70ch;
@@ -243,15 +243,15 @@ html, body, [class*="css"], .stApp {
 
 /* Metric card variants — custom HTML used in place of st.metric where space is tight */
 .it-mini-metric {
-    background: rgba(255, 255, 255, 0.025);
-    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(var(--it-overlay-rgb), 0.025);
+    border: 1px solid rgba(var(--it-overlay-rgb), 0.07);
     border-radius: 14px;
     padding: 16px 18px 18px;
     transition: border-color 0.18s;
 }
-.it-mini-metric:hover { border-color: rgba(212, 168, 67, 0.25); }
+.it-mini-metric:hover { border-color: rgba(var(--it-accent-gold-rgb), 0.25); }
 .it-mini-metric-label {
-    color: #8a8a93;
+    color: var(--it-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.14em;
     font-size: 10px;
@@ -260,7 +260,7 @@ html, body, [class*="css"], .stApp {
 .it-mini-metric-value {
     font-family: 'JetBrains Mono', monospace;
     font-weight: 600;
-    color: #e7e7e9;
+    color: var(--it-text-primary);
     font-size: 28px;
     line-height: 1.15;
     margin-top: 6px;
@@ -268,11 +268,11 @@ html, body, [class*="css"], .stApp {
 }
 .it-mini-metric-unit {
     font-size: 15px;
-    color: #7d7d86;
+    color: var(--it-text-muted);
     margin-left: 5px;
 }
 .it-mini-metric-sub {
-    color: #8a8a93;
+    color: var(--it-text-secondary);
     font-size: 11px;
     margin-top: 6px;
     font-family: 'JetBrains Mono', monospace;
@@ -295,24 +295,24 @@ html, body, [class*="css"], .stApp {
 
 /* Metric overrides — for regular st.metric usage */
 [data-testid="stMetric"] {
-    background: rgba(255, 255, 255, 0.025);
-    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(var(--it-overlay-rgb), 0.025);
+    border: 1px solid rgba(var(--it-overlay-rgb), 0.07);
     border-radius: 14px;
     padding: 18px 22px;
     transition: border-color 0.18s;
 }
 [data-testid="stMetric"]:hover {
-    border-color: rgba(212, 168, 67, 0.25);
+    border-color: rgba(var(--it-accent-gold-rgb), 0.25);
 }
 [data-testid="stMetricValue"] {
     font-family: 'JetBrains Mono', monospace !important;
     font-weight: 600;
-    color: #e7e7e9 !important;
+    color: var(--it-text-primary) !important;
     font-size: 30px !important;
     line-height: 1.15;
 }
 [data-testid="stMetricLabel"] {
-    color: #8a8a93 !important;
+    color: var(--it-text-secondary) !important;
     text-transform: uppercase;
     letter-spacing: 0.14em;
     font-size: 11px !important;
@@ -328,17 +328,17 @@ html, body, [class*="css"], .stApp {
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.20em;
-    color: #8a8a93;
+    color: var(--it-text-secondary);
     font-weight: 700;
     margin: 32px 0 14px;
     padding-bottom: 8px;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    border-bottom: 1px solid rgba(var(--it-overlay-rgb), 0.06);
 }
 
 /* Badges */
 .it-badge {
-    background: rgba(255, 255, 255, 0.025);
-    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(var(--it-overlay-rgb), 0.025);
+    border: 1px solid rgba(var(--it-overlay-rgb), 0.07);
     border-radius: 14px;
     padding: 20px 16px 16px;
     text-align: center;
@@ -347,22 +347,22 @@ html, body, [class*="css"], .stApp {
 }
 .it-badge:hover { transform: translateY(-2px); }
 .it-badge.unlocked {
-    border-color: rgba(212, 168, 67, 0.50);
-    background: linear-gradient(135deg, rgba(212, 168, 67, 0.10), rgba(212, 168, 67, 0.03));
-    box-shadow: 0 6px 28px rgba(212, 168, 67, 0.10);
+    border-color: rgba(var(--it-accent-gold-rgb), 0.50);
+    background: linear-gradient(135deg, rgba(var(--it-accent-gold-rgb), 0.10), rgba(var(--it-accent-gold-rgb), 0.03));
+    box-shadow: 0 6px 28px rgba(var(--it-accent-gold-rgb), 0.10);
 }
 .it-badge.locked { opacity: 0.42; filter: grayscale(0.5); }
 .it-badge-icon { font-size: 36px; margin-bottom: 10px; line-height: 1.0; }
-.it-badge-name { font-weight: 700; color: #e7e7e9; margin-bottom: 4px; font-size: 13px; }
-.it-badge-criteria { color: #8a8a93; font-size: 10.5px; line-height: 1.4; min-height: 28px; }
+.it-badge-name { font-weight: 700; color: var(--it-text-primary); margin-bottom: 4px; font-size: 13px; }
+.it-badge-criteria { color: var(--it-text-secondary); font-size: 10.5px; line-height: 1.4; min-height: 28px; }
 .it-badge-progress {
     font-family: 'JetBrains Mono', monospace;
-    color: #d4a843;
+    color: var(--it-accent-gold);
     font-size: 11px;
     margin-top: 10px;
     font-weight: 600;
 }
-.it-badge.locked .it-badge-progress { color: #8a8a93; }
+.it-badge.locked .it-badge-progress { color: var(--it-text-secondary); }
 
 /* Callouts */
 .it-callout {
@@ -379,47 +379,47 @@ html, body, [class*="css"], .stApp {
     vertical-align: middle;
 }
 .it-callout.warning {
-    background: rgba(232, 90, 79, 0.06);
-    border-color: rgba(232, 90, 79, 0.28);
-    color: #f4a99f;
+    background: rgba(var(--it-accent-red-rgb), 0.06);
+    border-color: rgba(var(--it-accent-red-rgb), 0.28);
+    color: var(--it-tint-red);
 }
 .it-callout.success {
-    background: rgba(93, 199, 124, 0.06);
-    border-color: rgba(93, 199, 124, 0.28);
-    color: #a6e3b8;
+    background: rgba(var(--it-accent-green-rgb), 0.06);
+    border-color: rgba(var(--it-accent-green-rgb), 0.28);
+    color: var(--it-tint-green);
 }
 .it-callout.info {
-    background: rgba(91, 156, 240, 0.06);
-    border-color: rgba(91, 156, 240, 0.28);
-    color: #a3c4f0;
+    background: rgba(var(--it-accent-blue-rgb), 0.06);
+    border-color: rgba(var(--it-accent-blue-rgb), 0.28);
+    color: var(--it-tint-blue);
 }
 .it-callout.gold {
-    background: rgba(212, 168, 67, 0.09);
-    border-color: rgba(212, 168, 67, 0.34);
-    color: #e6c887;
+    background: rgba(var(--it-accent-gold-rgb), 0.09);
+    border-color: rgba(var(--it-accent-gold-rgb), 0.34);
+    color: var(--it-tint-gold);
 }
 
 /* Worst-day card */
 .it-lowlight {
-    background: rgba(255, 255, 255, 0.025);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-left: 3px solid #e85a4f;
+    background: rgba(var(--it-overlay-rgb), 0.025);
+    border: 1px solid rgba(var(--it-overlay-rgb), 0.06);
+    border-left: 3px solid var(--it-accent-red);
     border-radius: 10px;
     padding: 14px 18px;
     margin: 8px 0;
 }
 .it-lowlight-date {
     font-family: 'JetBrains Mono', monospace;
-    color: #8a8a93;
+    color: var(--it-text-secondary);
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.12em;
 }
-.it-lowlight-title { color: #e7e7e9; font-weight: 600; margin-top: 4px; }
-.it-lowlight-caption { color: #f4a99f; font-style: italic; font-size: 13px; margin-top: 6px; }
+.it-lowlight-title { color: var(--it-text-primary); font-weight: 600; margin-top: 4px; }
+.it-lowlight-caption { color: var(--it-tint-red); font-style: italic; font-size: 13px; margin-top: 6px; }
 .it-lowlight-stats {
     font-family: 'JetBrains Mono', monospace;
-    color: #8a8a93;
+    color: var(--it-text-secondary);
     font-size: 11px;
     margin-top: 8px;
 }
@@ -429,26 +429,38 @@ h1, h2, h3, h4 {
     font-family: 'Inter Tight', sans-serif;
     font-weight: 700;
     letter-spacing: -0.02em;
-    color: #e7e7e9;
+    color: var(--it-text-primary);
 }
 h1 { font-size: 28px; }
 h2 { font-size: 20px; }
-h3 { font-size: 15px; color: #b5b5b9; font-weight: 600; }
+h3 { font-size: 15px; color: var(--it-text-soft); font-weight: 600; }
 
 /* Buttons */
 .stButton > button {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    color: #e7e7e9;
+    background: rgba(var(--it-overlay-rgb), 0.04);
+    border: 1px solid rgba(var(--it-overlay-rgb), 0.10);
+    color: var(--it-text-primary);
     border-radius: 10px;
     font-family: 'Inter Tight', sans-serif;
     font-weight: 600;
     transition: all 0.18s;
 }
 .stButton > button:hover {
-    border-color: #d4a843;
-    color: #d4a843;
+    border-color: var(--it-accent-gold);
+    color: var(--it-accent-gold);
 }
+
+/* Chart heights are driven by CSS so one server-rendered figure can be tall on
+   desktop and short on a phone. ui.plotly_chart() wraps each chart in a
+   container keyed `it-chart-<size>-<name>`, and the figure itself is rendered
+   with autosize so Plotly measures this box instead of a hardcoded height. */
+[class*="st-key-it-chart-"] [data-testid="stPlotlyChart"] {
+    height: var(--it-chart-h, 400px) !important;
+}
+[class*="st-key-it-chart-xtall"] { --it-chart-h: 460px; }
+[class*="st-key-it-chart-tall"] { --it-chart-h: 440px; }
+[class*="st-key-it-chart-standard"] { --it-chart-h: 320px; }
+[class*="st-key-it-chart-compact"] { --it-chart-h: 260px; }
 
 /* Tighter top padding for the main content area */
 .block-container { padding-top: 2rem; padding-bottom: 4rem; max-width: 1280px; }
@@ -487,9 +499,9 @@ footer { display: none !important; }
     gap: 6px !important;
     align-items: center !important;
     padding: 6px 10px !important;
-    border: 1px solid rgba(212, 168, 67, 0.55) !important;
+    border: 1px solid rgba(var(--it-accent-gold-rgb), 0.55) !important;
     border-radius: 10px !important;
-    background: rgba(10, 10, 12, 0.85) !important;
+    background: rgba(var(--it-bg-rgb), 0.85) !important;
     backdrop-filter: blur(12px);
 }
 [data-testid="stExpandSidebarButton"]::after {
@@ -499,9 +511,9 @@ footer { display: none !important; }
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #d4a843;
+    color: var(--it-accent-gold);
 }
-[data-testid="stExpandSidebarButton"] [data-testid="stIconMaterial"] { color: #d4a843 !important; }
+[data-testid="stExpandSidebarButton"] [data-testid="stIconMaterial"] { color: var(--it-accent-gold) !important; }
 
 /* ---------------------------------------------------------------
    Mobile. Measured at 390x844: default tap targets were 24-38px
@@ -532,12 +544,30 @@ footer { display: none !important; }
     [data-testid="stDownloadButton"] > button,
     [data-baseweb="select"] > div,
     [data-baseweb="select"] button,
-    [data-testid="stNumberInputField"] {
+    [data-testid="stNumberInputField"],
+    /* Streamlit 1.60 renders selects as react-aria comboboxes, so the
+       data-baseweb rule above stopped matching and dropdowns fell back to
+       38px. Measured at 390x844: select 38, text input 35.6, date input 35.6,
+       expander header 38 — all under the 44px guideline. */
+    [data-testid="stSelectbox"] input,
+    [data-testid="stSelectbox"] button,
+    [data-testid="stSelectbox"] .react-aria-ComboBox > div,
+    [data-testid="stTextInputRootElement"],
+    [data-testid="stTextInputRootElement"] input,
+    [data-testid="stDateInputField"],
+    [data-testid="stExpander"] summary {
         min-height: 44px !important;
     }
+    [data-testid="stExpander"] summary { align-items: center !important; }
 
     /* The modebar is too small to hit and overlaps the plot on phones. */
     .modebar-container { display: none !important; }
+
+    /* Desktop chart heights waste most of a 844px-tall viewport. */
+    [class*="st-key-it-chart-xtall"] { --it-chart-h: 380px; }
+    [class*="st-key-it-chart-tall"] { --it-chart-h: 360px; }
+    [class*="st-key-it-chart-standard"] { --it-chart-h: 300px; }
+    [class*="st-key-it-chart-compact"] { --it-chart-h: 240px; }
 
     .it-hero { padding: 24px 22px 22px; border-radius: 16px; }
     .it-hero-value {
@@ -554,9 +584,37 @@ footer { display: none !important; }
 """
 
 
+THEME_QUERY_PARAM = "theme"
+_THEME_STATE_KEY = "it_theme"
+
+
+def active_palette() -> str:
+    """The palette for this session: URL first, then session state, then default."""
+    requested = st.query_params.get(THEME_QUERY_PARAM)
+    if requested not in theme.PALETTES:
+        requested = st.session_state.get(_THEME_STATE_KEY)
+    if requested not in theme.PALETTES:
+        requested = theme.DEFAULT_PALETTE
+    return requested
+
+
+def select_palette(name: str) -> None:
+    """Persist a palette choice for this session and in a shareable URL."""
+    if name not in theme.PALETTES:
+        name = theme.DEFAULT_PALETTE
+    st.session_state[_THEME_STATE_KEY] = name
+    if name == theme.DEFAULT_PALETTE:
+        st.query_params.pop(THEME_QUERY_PARAM, None)
+    else:
+        st.query_params[THEME_QUERY_PARAM] = name
+
+
 def setup_page(title: str, icon: str, *, layout: str = "wide") -> None:
     """Page-config + theme + CSS in one call. Call once at the top of every page."""
     st.set_page_config(page_title=title, page_icon=icon, layout=layout)
+    # Before anything builds a figure, so charts and CSS agree on the palette.
+    st.session_state[_THEME_STATE_KEY] = theme.apply_palette(active_palette())
+    st.markdown(f"<style>\n{theme.css_variables()}\n</style>", unsafe_allow_html=True)
     st.markdown(_CSS, unsafe_allow_html=True)
     from .telemetry import configure_telemetry
 
@@ -564,6 +622,67 @@ def setup_page(title: str, icon: str, *, layout: str = "wide") -> None:
     from .auth import require_invited_user
 
     require_invited_user()
+
+
+PLOT_CONFIG = {"displayModeBar": False, "responsive": True}
+
+CHART_SIZES = ("xtall", "tall", "standard", "compact")
+
+# Only override the month-to-year tick band. Day-level ticks (what desktop
+# picks) keep Plotly's automatic format, so the desktop axis is untouched while
+# a phone shows `Mar '26` (~45px) instead of `Mar 2026` (57.6px measured).
+_DATE_TICKFORMATSTOPS = ({"dtickrange": [2419200000, "M12"], "value": "%b '%y"},)
+
+
+def _is_polar(fig: go.Figure) -> bool:
+    return any(getattr(trace, "type", "").endswith("polar") for trace in fig.data)
+
+
+def _chart_key(size: str, name: str) -> str:
+    """Container key whose ``st-key-`` class carries the CSS height token."""
+    if size not in CHART_SIZES:
+        raise ValueError(f"unknown chart size {size!r}; expected one of {CHART_SIZES}")
+    return f"it-chart-{size}-{name}"
+
+
+def chart_layout(fig: go.Figure, *, date_axis: bool = False) -> go.Figure:
+    """Strip the hardcoded height and apply the shared responsive layout."""
+    polar = _is_polar(fig)
+    has_legend = fig.layout.showlegend is not False and (len(fig.data) > 1 or polar)
+    fig.update_layout(
+        autosize=True,
+        height=None,
+        margin={
+            "l": 24 if polar else 36,
+            "r": 24 if polar else 12,
+            "t": 24,
+            "b": 64 if has_legend else 40,
+        },
+        legend={"orientation": "h", "yanchor": "top", "y": -0.18, "x": 0, "xanchor": "left"},
+    )
+    if not polar:
+        fig.update_xaxes(automargin=True)
+        fig.update_yaxes(automargin=True)
+        if date_axis:
+            fig.update_xaxes(tickformatstops=_DATE_TICKFORMATSTOPS)
+    return fig
+
+
+def plotly_chart(fig: go.Figure, name: str, *, size: str = "tall", date_axis: bool = False) -> None:
+    """Render ``fig`` with mobile-friendly defaults and a CSS-driven height.
+
+    Streamlit renders server-side and cannot see the viewport, so the figure
+    carries no height of its own: ``autosize`` makes Plotly measure the wrapper
+    box, whose height comes from ``--it-chart-h`` and flips at the 720px
+    breakpoint. Plotly reflows the SVG live on resize.
+
+    ``size`` picks one of :data:`CHART_SIZES`; ``date_axis`` shortens month-level
+    tick labels; ``name`` only has to be unique within a page.
+    """
+    key = _chart_key(size, name)
+    chart_layout(fig, date_axis=date_axis)
+    with st.container(key=key):
+        st.plotly_chart(fig, width="stretch", height="stretch", config=PLOT_CONFIG)
 
 
 def mini_metric(label: str, value: str, unit: str = "", sub: str = "") -> None:

@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import re
+
+import plotly.graph_objects as go
+import pytest
+
 from iron_trail import theme, ui
 
 
@@ -39,6 +44,23 @@ def test_css_meets_mobile_tap_target_and_hero_rules() -> None:
     assert "white-space: nowrap" in mobile
 
 
+def test_css_sizes_the_controls_streamlit_actually_renders() -> None:
+    """Streamlit 1.60 renders selects as react-aria comboboxes, so the older
+    [data-baseweb="select"] rule silently stopped matching and dropdowns
+    measured 38px again. Text inputs (35.6), date inputs (35.6) and expander
+    headers (38) were never covered at all."""
+    mobile = ui._CSS.split("@media (max-width: 720px)")[-1]
+
+    for selector in (
+        '[data-testid="stSelectbox"] input',
+        '[data-testid="stSelectbox"] .react-aria-ComboBox > div',
+        '[data-testid="stTextInputRootElement"] input',
+        '[data-testid="stDateInputField"]',
+        '[data-testid="stExpander"] summary',
+    ):
+        assert selector in mobile, f"{selector} is not sized for touch"
+
+
 def test_muted_text_passes_wcag_aa_on_the_app_background() -> None:
     """#5b5b62 scored 2.94:1 on #0a0a0c and failed AA for body text."""
 
@@ -57,7 +79,7 @@ def test_muted_text_passes_wcag_aa_on_the_app_background() -> None:
     assert contrast >= 4.5, f"text_muted contrast is only {contrast:.2f}:1"
 
 
-
+def test_sparkline_svg_markup_renders_safe_polyline() -> None:
     markup = ui._sparkline_svg_markup([2, 4, 3], color="#5b9cf0")
 
     assert "<svg" in markup
@@ -66,6 +88,93 @@ def test_muted_text_passes_wcag_aa_on_the_app_background() -> None:
     assert "<script" not in markup
     assert "0.00,28.00" in markup
     assert "100.00,16.00" in markup
+
+
+def test_css_holds_no_colour_literals() -> None:
+    """Colours live in theme.COLORS only. A literal in the stylesheet would be
+    invisible to the palette, so the two would drift apart."""
+    css = ui._CSS
+
+    assert not re.findall(r"#[0-9a-fA-F]{3,8}\b", css)
+    assert not re.findall(r"rgba?\(\s*\d", css)
+
+
+def test_every_css_variable_used_is_defined_by_the_palette() -> None:
+    declared = set(re.findall(r"--it-[a-z-]+(?=:)", theme.css_variables()))
+    # --it-chart-h is a layout token the stylesheet declares for itself.
+    declared |= set(re.findall(r"--it-[a-z-]+(?=:)", ui._CSS))
+    used = set(re.findall(r"var\((--it-[a-z-]+)", ui._CSS))
+
+    assert used, "expected the stylesheet to reference custom properties"
+    assert used <= declared, f"undefined custom properties: {sorted(used - declared)}"
+    assert "--it-accent-gold" in used
+
+
+def test_css_variables_render_hex_and_rgb_forms() -> None:
+    block = theme.css_variables()
+
+    assert block.startswith(":root {")
+    assert f"--it-accent-gold: {theme.COLORS['accent_gold']};" in block
+    # rgba(var(--it-accent-gold-rgb), 0.18) needs a bare triple, not a hex.
+    assert "--it-accent-gold-rgb: 212, 168, 67;" in block
+    assert "--it-overlay-rgb: 255, 255, 255;" in block
+
+
+def test_chart_layout_drops_the_hardcoded_height_so_css_can_drive_it() -> None:
+    """A server-rendered figure cannot know the viewport. Heights come from
+    --it-chart-h in the CSS instead, which flips at the 720px breakpoint."""
+    fig = go.Figure(go.Scatter(x=[1, 2], y=[1, 2]))
+    fig.update_layout(height=440)
+
+    ui.chart_layout(fig)
+
+    assert fig.layout.height is None
+    assert fig.layout.autosize is True
+    assert fig.layout.margin.l == 36
+    assert fig.layout.legend.orientation == "h"
+    assert fig.layout.xaxis.automargin is True
+    assert fig.layout.yaxis.automargin is True
+
+
+def test_chart_layout_only_shortens_month_level_date_ticks() -> None:
+    """`Mar 2026` measured 57.6px on a 358px-wide chart. Overriding only the
+    month-to-year tick band shortens it to `Mar '26` without touching the
+    day-level ticks desktop actually renders."""
+    fig = ui.chart_layout(go.Figure(go.Scatter(x=[1, 2], y=[1, 2])), date_axis=True)
+
+    stops = fig.layout.xaxis.tickformatstops
+    assert [stop.value for stop in stops] == ["%b '%y"]
+    assert stops[0].dtickrange[1] == "M12"
+
+    plain = ui.chart_layout(go.Figure(go.Scatter(x=[1, 2], y=[1, 2])))
+    assert not plain.layout.xaxis.tickformatstops
+
+
+def test_chart_layout_keeps_polar_charts_centred() -> None:
+    """The radar has no cartesian axes, and an asymmetric left margin would
+    push it off centre."""
+    fig = go.Figure(go.Scatterpolar(r=[1, 2], theta=[0, 90]))
+
+    ui.chart_layout(fig, date_axis=True)
+
+    assert fig.layout.margin.l == fig.layout.margin.r == 24
+    assert not fig.layout.xaxis.tickformatstops
+
+
+def test_chart_key_encodes_the_size_token_and_rejects_unknown_sizes() -> None:
+    assert ui._chart_key("compact", "timeofday") == "it-chart-compact-timeofday"
+    with pytest.raises(ValueError, match="unknown chart size"):
+        ui._chart_key("enormous", "whatever")
+
+
+def test_css_drives_chart_height_at_both_breakpoints() -> None:
+    css = ui._CSS
+    mobile = css.split("@media (max-width: 720px)")[-1]
+
+    assert 'var(--it-chart-h' in css
+    for size in ui.CHART_SIZES:
+        assert f'[class*="st-key-it-chart-{size}"]' in css
+        assert f'[class*="st-key-it-chart-{size}"]' in mobile
 
 
 def test_sparkline_svg_markup_handles_flat_and_invalid_values() -> None:

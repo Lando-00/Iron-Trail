@@ -14,7 +14,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from . import auth, config, ingest, runtime
+from . import auth, config, ingest, runtime, theme, ui
 from .cloud_storage import CloudStorageError, get_dataset_repository
 from .uploads import UploadValidationError
 
@@ -37,15 +37,35 @@ def _load_from_bytes(content: bytes, _filename: str, body_weight_kg: float) -> p
     return ingest.load_and_clean(io.BytesIO(content), body_weight_kg=body_weight_kg)
 
 
+def render_theme_picker() -> None:
+    """Palette selector. Persisted per session and mirrored into the URL."""
+    names = list(theme.PALETTES)
+    current = ui.active_palette()
+    choice = st.selectbox(
+        "Theme",
+        names,
+        index=names.index(current),
+        format_func=lambda name: theme.PALETTE_LABELS.get(name, name),
+        key="it_theme_choice",
+        help="High contrast brightens text and accents; AMOLED uses true black.",
+    )
+    if choice != current:
+        ui.select_palette(choice)
+        st.rerun()
+
+
 def render_data_source() -> tuple[pd.DataFrame, str, float]:
     """Render the IronTrail sidebar. Returns (df, source_label, body_weight_kg)."""
     try:
         if runtime.is_cloud():
-            return _render_cloud_data_source()
-        return _render_local_data_source()
+            source = _render_cloud_data_source()
+        else:
+            source = _render_local_data_source()
     except (CloudStorageError, UploadValidationError, runtime.ConfigurationError) as exc:
         st.error(str(exc))
         st.stop()
+    render_theme_picker()
+    return source
 
 
 def _render_local_data_source() -> tuple[pd.DataFrame, str, float]:
