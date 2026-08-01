@@ -8,7 +8,9 @@ import pandas as pd
 MIN_WINDOW_WEEKS = 8
 MAX_WINDOW_WEEKS = 104
 WINDOW_STEP_WEEKS = 4
-DEFAULT_WINDOW_WEEKS = 52
+# 52 weeks gives ~7px per week on a 358px-wide phone chart, which is unreadable.
+# 26 weeks stays legible on mobile; the slider still reaches 104.
+DEFAULT_WINDOW_WEEKS = 26
 
 
 def max_calendar_window_weeks(dates: pd.Series) -> int:

@@ -7,6 +7,8 @@ Plotly theme is registered.
 from __future__ import annotations
 
 import html
+import math
+import re
 from collections.abc import Iterable
 
 import plotly.graph_objects as go
@@ -111,6 +113,47 @@ html, body, [class*="css"], .stApp {
     color: #8a8a93;
 }
 
+/* Tabs — render as a real segmented control. Streamlit's default is small
+   grey text that reads like a caption, so whole sections go unnoticed. */
+[data-testid="stTabs"] [role="tablist"] {
+    gap: 8px;
+    flex-wrap: wrap;
+    border-bottom: none !important;
+    margin-bottom: 8px;
+}
+[data-testid="stTab"] {
+    min-height: 44px;
+    padding: 9px 15px !important;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.028);
+    font-weight: 600;
+    transition: border-color 0.18s, background 0.18s, color 0.18s;
+}
+[data-testid="stTab"],
+[data-testid="stTab"] * { color: #b9b9c2 !important; }
+[data-testid="stTab"]:hover {
+    border-color: rgba(212, 168, 67, 0.45);
+    background: rgba(255, 255, 255, 0.05);
+}
+[data-testid="stTab"]:hover * { color: #e7e7e9 !important; }
+[data-testid="stTab"][aria-selected="true"] {
+    border-color: rgba(212, 168, 67, 0.75);
+    background: linear-gradient(135deg, rgba(212, 168, 67, 0.16), rgba(212, 168, 67, 0.05));
+    box-shadow: 0 4px 18px rgba(212, 168, 67, 0.12);
+}
+[data-testid="stTab"][aria-selected="true"] * { color: #d4a843 !important; }
+/* Hide the default underline indicator — the pill carries the state now. */
+[data-testid="stTabs"] [data-baseweb="tab-highlight"],
+[data-testid="stTabs"] [data-baseweb="tab-border"] { display: none !important; }
+
+/* Suggested starter prompts for the Coach chat. */
+.it-chat-hint {
+    color: #8a8a93;
+    font-size: 12.5px;
+    margin: 2px 0 8px;
+}
+
 /* Hall of Fame highlight card (gold-glow inverse of lowlight) */
 .it-highlight {
     background: linear-gradient(135deg, rgba(212, 168, 67, 0.07), rgba(212, 168, 67, 0.015));
@@ -185,7 +228,7 @@ html, body, [class*="css"], .stApp {
 }
 .it-hero-unit {
     font-size: 26px;
-    color: #5b5b62;
+    color: #7d7d86;
     margin-left: 10px;
     font-weight: 500;
     letter-spacing: 0;
@@ -225,7 +268,7 @@ html, body, [class*="css"], .stApp {
 }
 .it-mini-metric-unit {
     font-size: 15px;
-    color: #5b5b62;
+    color: #7d7d86;
     margin-left: 5px;
 }
 .it-mini-metric-sub {
@@ -233,6 +276,21 @@ html, body, [class*="css"], .stApp {
     font-size: 11px;
     margin-top: 6px;
     font-family: 'JetBrains Mono', monospace;
+}
+
+.it-sparkline-wrap {
+    height: 56px;
+    margin-top: 5px;
+}
+.it-sparkline {
+    display: block;
+    height: 100%;
+    width: 100%;
+}
+@media (max-width: 720px) {
+    .it-sparkline-wrap {
+        height: 42px;
+    }
 }
 
 /* Metric overrides — for regular st.metric usage */
@@ -398,10 +456,100 @@ h3 { font-size: 15px; color: #b5b5b9; font-weight: 600; }
 /* Dataframes get the mono treatment */
 [data-testid="stDataFrame"] table { font-family: 'JetBrains Mono', monospace !important; font-size: 12px; }
 
-/* Hide the default Streamlit header chrome */
-header { display: none !important; }
+/* Strip the Streamlit chrome we don't want, but keep the sidebar toggle.
+   The expand-sidebar button lives inside <header>, and Streamlit auto-collapses
+   the sidebar on narrow screens — hiding the header outright would strand
+   mobile users with no navigation and no uploader. */
+header[data-testid="stHeader"] {
+    background: transparent !important;
+    box-shadow: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    pointer-events: none !important;
+}
+header[data-testid="stHeader"] [data-testid="stToolbar"] { pointer-events: none !important; }
+[data-testid="stToolbarActions"],
+[data-testid="stAppDeployButton"],
+[data-testid="stMainMenu"],
+[data-testid="stStatusWidget"],
 #MainMenu { display: none !important; }
 footer { display: none !important; }
+
+[data-testid="stExpandSidebarButton"] {
+    pointer-events: auto !important;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: fixed !important;
+    top: 10px !important;
+    left: 12px !important;
+    z-index: 1000000 !important;
+    gap: 6px !important;
+    align-items: center !important;
+    padding: 6px 10px !important;
+    border: 1px solid rgba(212, 168, 67, 0.55) !important;
+    border-radius: 10px !important;
+    background: rgba(10, 10, 12, 0.85) !important;
+    backdrop-filter: blur(12px);
+}
+[data-testid="stExpandSidebarButton"]::after {
+    content: 'Menu';
+    font-family: 'Inter Tight', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #d4a843;
+}
+[data-testid="stExpandSidebarButton"] [data-testid="stIconMaterial"] { color: #d4a843 !important; }
+
+/* ---------------------------------------------------------------
+   Mobile. Measured at 390x844: default tap targets were 24-38px
+   (below the 44px guideline), the hero number wrapped to two lines,
+   and the Plotly modebar was unusable at 24x22.
+   --------------------------------------------------------------- */
+@media (max-width: 720px) {
+    /* Leave room for the floating Menu button where the sidebar starts collapsed. */
+    .block-container { padding-top: 4.25rem; }
+
+    [data-testid="stExpandSidebarButton"] {
+        min-height: 44px !important;
+        padding: 8px 12px !important;
+        top: calc(env(safe-area-inset-top, 0px) + 10px) !important;
+    }
+    [data-testid="stSidebarNavLink"] {
+        min-height: 44px !important;
+        padding: 10px 14px !important;
+        align-items: center !important;
+    }
+    [data-testid="stSidebarCollapseButton"],
+    [data-testid="stSidebarCollapseButton"] button {
+        min-width: 44px !important;
+        min-height: 44px !important;
+    }
+    .stButton > button,
+    [data-testid="stSidebar"] button,
+    [data-testid="stDownloadButton"] > button,
+    [data-baseweb="select"] > div,
+    [data-baseweb="select"] button,
+    [data-testid="stNumberInputField"] {
+        min-height: 44px !important;
+    }
+
+    /* The modebar is too small to hit and overlaps the plot on phones. */
+    .modebar-container { display: none !important; }
+
+    .it-hero { padding: 24px 22px 22px; border-radius: 16px; }
+    .it-hero-value {
+        font-size: clamp(40px, 12vw, 72px);
+        white-space: nowrap;
+        letter-spacing: -0.05em;
+    }
+    .it-hero-unit { font-size: clamp(16px, 4.8vw, 26px); margin-left: 6px; }
+    .it-hero-subtitle { font-size: 13px; max-width: none; }
+
+    .it-review-card { padding: 20px 18px; }
+}
 </style>
 """
 
@@ -521,6 +669,52 @@ def quote_card(text: str, meta: str = "", kind: str = "default", variants: list[
 
 def _escape(value: object) -> str:
     return html.escape(str(value), quote=True)
+
+
+def sparkline_svg(values: Iterable[float], color: str | None = None) -> None:
+    """Render a lightweight, module-free sparkline for compact metric cards."""
+    st.markdown(
+        _sparkline_svg_markup(values, color=color),
+        unsafe_allow_html=True,
+    )
+
+
+def _sparkline_svg_markup(values: Iterable[float], color: str | None = None) -> str:
+    clean_values = [
+        number
+        for value in values
+        if math.isfinite(number := float(value))
+    ]
+    if not clean_values:
+        return ""
+
+    safe_color = color or theme.COLORS["accent_gold"]
+    if not re.fullmatch(r"#[0-9a-fA-F]{3,8}", safe_color):
+        safe_color = theme.COLORS["accent_gold"]
+
+    minimum = min(clean_values)
+    maximum = max(clean_values)
+    span = maximum - minimum
+    if span == 0:
+        points = [(0.0, 16.0), (100.0, 16.0)]
+    else:
+        denominator = max(len(clean_values) - 1, 1)
+        points = [
+            (
+                100 * index / denominator,
+                28 - ((value - minimum) / span * 24),
+            )
+            for index, value in enumerate(clean_values)
+        ]
+    point_text = " ".join(f"{x:.2f},{y:.2f}" for x, y in points)
+    return (
+        '<div class="it-sparkline-wrap">'
+        '<svg class="it-sparkline" viewBox="0 0 100 32" '
+        'preserveAspectRatio="none" role="img" aria-label="Recent trend">'
+        f'<polyline points="{point_text}" fill="none" stroke="{safe_color}" '
+        'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'
+        "</svg></div>"
+    )
 
 
 def sparkline(values: Iterable[float], color: str | None = None, height: int = 56) -> go.Figure:

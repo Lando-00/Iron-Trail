@@ -89,10 +89,20 @@ PERSONALITIES = list(prompts.PERSONALITY_LABELS.keys())
 if "coach_personality" not in st.session_state:
     st.session_state["coach_personality"] = "default"
 
+# Cold-start suggestions for the chat tab — every one is answerable from the
+# structured summary the chat context already builds.
+STARTER_PROMPTS = [
+    "What's my weakest muscle group?",
+    "Which lift has stalled the longest?",
+    "How consistent was I this month?",
+    "Is my push:pull balance okay?",
+]
+
 st.title("💬 Coach")
 st.caption(
-    "AI-written training reviews and an 'ask your data' chat — "
-    "all backed by your loaded Hevy data, powered by "
+    "Weekly and monthly AI-written reviews — plus **💬 Ask Coach**, a chat "
+    "that answers questions about your own training. Everything is backed by "
+    "your loaded Hevy data, powered by "
     f"{'Microsoft Foundry' if runtime.is_cloud() else 'Copilot'}."
 )
 
@@ -108,7 +118,7 @@ with header_r:
     if personality != st.session_state["coach_personality"]:
         st.session_state["coach_personality"] = personality
 
-tabs = st.tabs(["📅 Weekly", "🗓️ Monthly", "💬 Ask Your Data", "🎭 Settings"])
+tabs = st.tabs(["📅 Weekly", "🗓️ Monthly", "💬 Ask Coach", "🎭 Settings"])
 
 # =====================================================================
 # WEEKLY TAB
@@ -215,7 +225,9 @@ with tabs[0]:
     else:
         st.markdown(
             '<div class="it-coach-empty">Click <b>Generate weekly review</b> '
-            'to ask the coach about this week\'s training.</div>',
+            'to ask the coach about this week\'s training.<br><br>'
+            'Got a specific question instead? Open '
+            '<b>💬 Ask Coach</b> above.</div>',
             unsafe_allow_html=True,
         )
 
@@ -321,7 +333,9 @@ with tabs[1]:
     else:
         st.markdown(
             '<div class="it-coach-empty">Click <b>Generate monthly recap</b> '
-            'for a deeper retrospective with strength trajectories.</div>',
+            'for a deeper retrospective with strength trajectories.<br><br>'
+            'Got a specific question instead? Open '
+            '<b>💬 Ask Coach</b> above.</div>',
             unsafe_allow_html=True,
         )
 
@@ -340,18 +354,30 @@ with tabs[2]:
     if "coach_chat_history" not in st.session_state:
         st.session_state["coach_chat_history"] = []
 
-    c1, c2 = st.columns([4, 1])
-    with c2:
-        if st.button("🧹 Clear chat", use_container_width=True):
-            st.session_state["coach_chat_history"] = []
-            st.rerun()
+    starter_click: str | None = None
+    if st.session_state["coach_chat_history"]:
+        _, clear_col = st.columns([3, 1])
+        with clear_col:
+            if st.button("🧹 Clear chat", use_container_width=True):
+                st.session_state["coach_chat_history"] = []
+                st.rerun()
+    else:
+        st.markdown(
+            '<div class="it-chat-hint">Not sure what to ask? Tap a starter:</div>',
+            unsafe_allow_html=True,
+        )
+        starter_cols = st.columns(2)
+        for index, starter in enumerate(STARTER_PROMPTS):
+            with starter_cols[index % 2]:
+                if st.button(starter, key=f"coach_starter_{index}", use_container_width=True):
+                    starter_click = starter
 
     # Render history
     for role, content in st.session_state["coach_chat_history"]:
         with st.chat_message(role):
             st.markdown(content)
 
-    user_input = st.chat_input("Ask the coach about your training…")
+    user_input = starter_click or st.chat_input("Ask the coach about your training…")
     if user_input:
         st.session_state["coach_chat_history"].append(("user", user_input))
         with st.chat_message("user"):

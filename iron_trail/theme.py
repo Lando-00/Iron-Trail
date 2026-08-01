@@ -17,7 +17,9 @@ COLORS = {
     "border_strong": "rgba(255,255,255,0.18)",
     "text_primary": "#e7e7e9",
     "text_secondary": "#8a8a93",
-    "text_muted": "#5b5b62",
+    # 4.85:1 on #0a0a0c — the previous #5b5b62 was 2.94:1 and failed WCAG AA
+    # for body text, which showed up badly on phones in daylight.
+    "text_muted": "#7d7d86",
     "accent_gold": "#d4a843",
     "accent_blue": "#5b9cf0",
     "accent_red": "#e85a4f",

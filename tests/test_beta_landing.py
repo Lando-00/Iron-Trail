@@ -8,6 +8,19 @@ from iron_trail import beta_landing
 NOW = datetime(2026, 7, 18, 15, 0, tzinfo=UTC)
 
 
+def test_landing_hides_every_sidebar_affordance() -> None:
+    css = beta_landing._LANDING_CSS
+
+    for testid in (
+        "stSidebar",
+        "stSidebarNav",
+        "stSidebarCollapsedControl",
+        "stSidebarCollapseButton",
+        "stExpandSidebarButton",
+    ):
+        assert f'[data-testid="{testid}"]' in css
+
+
 def test_target_is_deterministic_and_private_seeded() -> None:
     first = beta_landing.resolve_target({"IRONTRAIL_BETA_REVEAL_SEED": "first"})
     repeated = beta_landing.resolve_target({"IRONTRAIL_BETA_REVEAL_SEED": "first"})

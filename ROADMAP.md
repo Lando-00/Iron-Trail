@@ -48,7 +48,7 @@ export buttons (Save to Vault · Download .md · PDF · Copy).
     prose from the LLM).
   - 🗓️ **Monthly** — same but over a 4-week window, with per-exercise
     1RM trajectory and archetype mix.
-  - 💬 **Ask Your Data** — multi-turn chat scoped to the loaded CSV,
+  - 💬 **Ask Coach** — multi-turn chat scoped to the loaded CSV,
     8-turn history cap.
   - 🎭 **Settings** — personality preset + provider status.
 - **Provider** — official `github-copilot-sdk` Python package, wrapping the

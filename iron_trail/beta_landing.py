@@ -45,7 +45,9 @@ _LANDING_CSS = """
 
 [data-testid="stSidebar"],
 [data-testid="stSidebarNav"],
-[data-testid="stSidebarCollapsedControl"] {
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="stSidebarCollapseButton"],
+[data-testid="stExpandSidebarButton"] {
     display: none !important;
 }
 

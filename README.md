@@ -40,7 +40,7 @@ an LLM-written weekly review.
 | 📅 **Adherence** | Calendar coloured by K-Means session archetype (Strength / Hypertrophy / Pump / Quick), archetype distribution, time-of-day histogram |
 | 🏆 **Achievements** | 20-badge library with progress bars, closest-to-unlock callout, unlocked/locked walls |
 | 😂 **Quotes** | Indecisive-naming clusters, single-word laments, self-roasting, emoji-heavy titles — your real workout titles surfaced as a wall |
-| 💬 **Coach** | LLM-written weekly + monthly training reviews, "Ask Your Data" chat, 5 personality presets. Local mode uses your Copilot subscription; hosted mode uses a rate-limited Microsoft Foundry deployment. |
+| 💬 **Coach** | LLM-written weekly + monthly training reviews, "Ask Coach" chat with starter prompts, 5 personality presets. Local mode uses your Copilot subscription; hosted mode uses a rate-limited Microsoft Foundry deployment. |
 
 Plus a **💀 Hall of Shame** + **🏆 Hall of Fame** expander on Overview
 (worst and best sessions with witty captions), a **📝 Generate daily
