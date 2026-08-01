@@ -1,0 +1,4 @@
+# The lockfile is compared byte-for-byte against freshly generated output by
+# `scripts/lock_dependencies.py --check`, and uv always writes LF. Without this,
+# core.autocrlf=true checks it out with CRLF and the check can never pass.
+requirements-cloud.lock text eol=lf

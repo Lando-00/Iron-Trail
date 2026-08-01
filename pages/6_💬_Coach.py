@@ -6,6 +6,7 @@ Obsidian vault (or downloading as Markdown / PDF) is one click away.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 from datetime import date, timedelta
@@ -58,6 +59,40 @@ def _get_foundry_provider(profile):
 @st.cache_resource(show_spinner=False)
 def _get_usage_limiter():
     return UsageLimiter(get_usage_repository())
+
+
+def _render_pdf_export(md: str, *, label: str, title: str, slot: str) -> None:
+    """Offer a PDF download, building it on click rather than on every rerun.
+
+    Rendering a PDF is expensive and used to run on every script rerun, so
+    simply opening the page paid for it repeatedly. The result is cached
+    against a digest of the Markdown so regenerating a review invalidates it.
+    """
+    digest = hashlib.sha256(md.encode("utf-8")).hexdigest()
+    cached = st.session_state.get(f"coach_pdf_{slot}")
+
+    if cached and cached[0] == digest:
+        st.download_button(
+            "📄 PDF",
+            data=cached[1],
+            file_name=f"{label}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            key=f"dl_{slot}_pdf",
+        )
+        return
+
+    if st.button("📄 Build PDF", use_container_width=True, key=f"build_{slot}_pdf"):
+        from iron_trail.coach.export.pdf import markdown_to_pdf
+
+        try:
+            st.session_state[f"coach_pdf_{slot}"] = (digest, markdown_to_pdf(md, title=title))
+        except Exception:
+            logger.exception("PDF export failed")
+            st.session_state[f"coach_pdf_{slot}"] = None
+            st.error("PDF export is unavailable. Download the Markdown instead.")
+        else:
+            st.rerun()
 
 
 def get_provider(kind: CallKind):
@@ -222,21 +257,9 @@ with tabs[0]:
                 key="dl_weekly_md",
             )
         with ec3:
-            try:
-                from iron_trail.coach.export.pdf import markdown_to_pdf
-
-                pdf_bytes = markdown_to_pdf(md, title=f"Weekly Review · {label}")
-                st.download_button(
-                    "📄 PDF",
-                    data=pdf_bytes,
-                    file_name=f"{label}.pdf",
-                    mime="application/pdf",
-                    use_container_width=True,
-                    key="dl_weekly_pdf",
-                )
-            except Exception as e:
-                st.button("📄 PDF (n/a)", disabled=True, use_container_width=True,
-                          help=f"PDF export unavailable: {e}", key="dl_weekly_pdf_disabled")
+            _render_pdf_export(
+                md, label=label, title=f"Weekly Review · {label}", slot="weekly"
+            )
         with ec4:
             with st.popover("📋 Copy"):
                 st.code(md, language="markdown")
@@ -330,21 +353,9 @@ with tabs[1]:
                 key="dl_monthly_md",
             )
         with ec3:
-            try:
-                from iron_trail.coach.export.pdf import markdown_to_pdf
-
-                pdf_bytes = markdown_to_pdf(md, title=f"Monthly Recap · {label}")
-                st.download_button(
-                    "📄 PDF",
-                    data=pdf_bytes,
-                    file_name=f"{label}.pdf",
-                    mime="application/pdf",
-                    use_container_width=True,
-                    key="dl_monthly_pdf",
-                )
-            except Exception:
-                st.button("📄 PDF (n/a)", disabled=True, use_container_width=True,
-                          key="dl_monthly_pdf_disabled")
+            _render_pdf_export(
+                md, label=label, title=f"Monthly Recap · {label}", slot="monthly"
+            )
         with ec4:
             with st.popover("📋 Copy"):
                 st.code(md, language="markdown")

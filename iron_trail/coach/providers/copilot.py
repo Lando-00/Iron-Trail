@@ -12,13 +12,35 @@ from __future__ import annotations
 
 import asyncio
 import atexit
+import logging
 import threading
 from typing import Any
 
 from . import Message, TokenUsage
 
+logger = logging.getLogger(__name__)
 
 _PromptText = str
+
+
+def _deny_all_permissions(request: Any, invocation: dict[str, str]) -> Any:
+    """Refuse every tool permission the agent asks for.
+
+    The Coach only needs text generation. Approving everything meant a workout
+    or exercise name from an uploaded CSV — attacker-controlled text that is
+    embedded in the system prompt — could talk the agent into a file or shell
+    tool and have it approved automatically. Reporting "no user available" is
+    accurate here: this runs headless inside a Streamlit rerun with nobody to
+    consent.
+    """
+    from copilot.session import PermissionDecisionUserNotAvailable
+
+    logger.warning(
+        "denied Copilot tool permission request: %r (invocation=%r)",
+        getattr(request, "data", request),
+        invocation,
+    )
+    return PermissionDecisionUserNotAvailable()
 
 
 class CopilotProvider:
@@ -59,12 +81,11 @@ class CopilotProvider:
         return self._client
 
     async def _send(self, prompt: _PromptText, *, timeout: float) -> str:
-        from copilot.session import PermissionHandler
         from copilot.generated.session_events import AssistantMessageData
 
         client = await self._ensure_client()
         session = await client.create_session(
-            on_permission_request=PermissionHandler.approve_all,
+            on_permission_request=_deny_all_permissions,
         )
         response = await session.send_and_wait(prompt, timeout=timeout)
         if response is None:
