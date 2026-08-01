@@ -386,7 +386,12 @@ with tabs[2]:
         with st.chat_message(role):
             st.markdown(content)
 
-    user_input = starter_click or st.chat_input("Ask the coach about your training…")
+    # st.chat_input must be called unconditionally. Writing
+    # `starter_click or st.chat_input(...)` short-circuits, so clicking a
+    # starter skips the widget entirely and the input vanishes for the rest
+    # of that run.
+    typed_input = st.chat_input("Ask the coach about your training…")
+    user_input = starter_click or typed_input
     if user_input:
         st.session_state["coach_chat_history"].append(("user", user_input))
         with st.chat_message("user"):
