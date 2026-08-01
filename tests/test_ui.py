@@ -57,7 +57,7 @@ def test_muted_text_passes_wcag_aa_on_the_app_background() -> None:
     assert contrast >= 4.5, f"text_muted contrast is only {contrast:.2f}:1"
 
 
-
+def test_sparkline_svg_markup_renders_safe_polyline() -> None:
     markup = ui._sparkline_svg_markup([2, 4, 3], color="#5b9cf0")
 
     assert "<svg" in markup
