@@ -25,7 +25,7 @@ small or too dense to use on a phone).
 | 8 | **Coach chat discoverability** | Renamed *Ask Your Data* → *Ask Coach*, added 4 starter prompts, cross-linked from the Weekly/Monthly empty states |
 | 9 | **Charts are genuinely responsive** | See *CSS-responsive chart heights* below |
 | 10 | **Volume legend tail grouped into `other`** | Legend 247×121 → 209×83 on a 358px chart |
-| 11 | **Stylesheet driven by CSS custom properties** | `_CSS` holds no colour literal; 87 computed-style snapshots identical before/after |
+| 11 | **Stylesheet driven by CSS custom properties** | `_CSS` holds no colour literal; all 520 declarations round-trip identically |
 | 12 | **Theme picker** — `dark_gold`, `high_contrast`, `amoled` | Palette flips `--it-bg` `#0a0a0c` → `#000000` live; every palette held to 4.5:1 by test |
 | 13 | **Tap targets re-fixed for Streamlit 1.60** | The 1.35-era `[data-baseweb="select"]` rule had silently stopped matching |
 
@@ -82,9 +82,16 @@ which is why the picker was previously scoped at 2–3 days. Both steps landed:
 3. The choice lives in session state and is mirrored into `?theme=`, so it
    survives navigation and can be shared. The default is left out of the URL.
 
-The refactor is provably invisible: 36 selectors × 2 viewports of
-`getComputedStyle` output on Overview, plus 15 on Quotes, are **identical**
-before the refactor and after the whole palette stack landed.
+The refactor is provably invisible, two ways:
+
+- **Exhaustively**, by resolving every `var(--it-*)` and
+  `rgba(var(--it-*-rgb), a)` back to a literal and diffing the result against
+  the pre-refactor stylesheet: of **520** declaration lines, the only
+  difference is one selector line that a *later* commit extended — every colour
+  round-trips identically.
+- **In the browser**, by `getComputedStyle`: 36 selectors × 2 viewports on
+  Overview are identical before the refactor and after the whole palette stack
+  landed.
 
 **Known limitation.** `theme.COLORS` is process-global, so two concurrent
 hosted sessions on different palettes can transiently trade *chart* accent
