@@ -30,6 +30,12 @@ MAX_HISTORY_TURNS = 8
 # Exercises named in a question get a full monthly history attached.
 _MAX_FOCUS_EXERCISES = 3
 _TREND_MONTHS = 6
+# The catalogue must stay bounded. A real 3.7-year export has 142 exercises;
+# sending detail for all of them measured 10,198 input tokens, which alone
+# exceeds the deployment's 10k tokens-per-minute quota and 429s every call.
+# Detail goes to the heaviest lifts; every other name is still listed cheaply
+# so the coach can tell what exists and never invents a lift.
+_MAX_CATALOG_DETAIL = 25
 _WORD = re.compile(r"[a-z0-9]+")
 
 
@@ -150,9 +156,11 @@ def build_chat_context(
     working = win[win["is_working"]] if not win.empty else win
     sessions = win.drop_duplicates("workout_id")
 
-    # Every lift, with all-time best and current standing — not just a top 8.
+    # Detail for the heaviest lifts, names only for the rest — the full list
+    # keeps the coach honest about what does and does not exist.
+    all_names = metrics.exercise_list(df)
     catalog: list[dict[str, Any]] = []
-    for exercise in metrics.exercise_list(df):
+    for exercise in all_names:
         status = analytics.plateau_status(df, exercise, today=today)
         if status is None:
             continue
@@ -166,6 +174,9 @@ def build_chat_context(
             }
         )
     catalog.sort(key=lambda item: -item["all_time_best_e1rm_kg"])
+    detailed = catalog[:_MAX_CATALOG_DETAIL]
+    detailed_names = {item["exercise"] for item in detailed}
+    other_names = [name for name in all_names if name not in detailed_names]
 
     # Volume by muscle over the last 90 days.
     muscle_volume: list[dict[str, Any]] = []
@@ -236,14 +247,15 @@ def build_chat_context(
         "current_streak_days": metrics.current_streak(df, today=today),
         "longest_streak_days": metrics.longest_streak(df),
         "monthly_totals": monthly,
-        "exercise_catalog": catalog,
+        "exercise_catalog": detailed,
+        "other_exercises_logged": other_names,
         "muscle_volume_90d": muscle_volume,
         "weekly_push_pull": push_pull,
         "plateau_watch": plateau_brief,
     }
 
     if question:
-        exercises = metrics.exercise_list(df)
+        exercises = all_names
         focus = find_mentioned_exercises(question, exercises)
         if not focus and history:
             # "and what's the trend?" refers to whatever was last discussed.

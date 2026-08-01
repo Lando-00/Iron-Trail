@@ -117,6 +117,38 @@ def test_context_without_a_question_has_no_focus(frame: pd.DataFrame) -> None:
     assert "focus_exercises" not in coach_chat.build_chat_context(frame)
 
 
+def test_exercise_detail_is_bounded_but_every_lift_is_still_named() -> None:
+    """A real 3.7-year export has 142 exercises. Sending detail for all of them
+    measured 10,198 input tokens, which alone exceeds the deployment's 10k
+    tokens-per-minute quota and 429s every call."""
+    rows = []
+    for index in range(60):
+        for day in range(4):
+            rows.append(
+                {
+                    "workout_date": pd.Timestamp("2026-03-01") + pd.Timedelta(days=day),
+                    "workout_id": f"w{index}-{day}",
+                    "exercise_title": f"Exercise {index}",
+                    "is_working": True,
+                    "volume_kg": 500.0 + index,
+                    "e1rm_kg": 50.0 + index,
+                    "weight_kg_load": 40.0 + index,
+                    "reps": 5,
+                    "primary_muscle": "Quadriceps",
+                    "movement_type": "push",
+                }
+            )
+    frame = pd.DataFrame(rows)
+    frame["workout_date"] = frame["workout_date"].dt.date
+
+    context = coach_chat.build_chat_context(frame)
+
+    assert len(context["exercise_catalog"]) <= 25
+    named = {item["exercise"] for item in context["exercise_catalog"]}
+    named |= set(context["other_exercises_logged"])
+    assert len(named) == 60, "every lift must still be named so nothing is invented"
+
+
 def test_context_stays_well_inside_the_input_budget(frame: pd.DataFrame) -> None:
     from iron_trail.usage_limits import UsagePolicy, estimate_tokens
 

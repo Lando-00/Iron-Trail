@@ -86,7 +86,16 @@ def call_coach(messages: list[Message], kind: CallKind, timeout: float) -> str:
     except Exception as exc:
         logger.exception("Coach provider call failed")
         if runtime.is_cloud():
-            st.error("The hosted Coach is temporarily unavailable.")
+            # A 429 is the model deployment's per-minute token budget, not an
+            # outage, and it clears on its own — say so rather than implying
+            # the Coach is broken.
+            if type(exc).__name__ == "RateLimitError" or "429" in str(exc):
+                st.warning(
+                    "The Coach is at its per-minute limit. Wait a few seconds "
+                    "and send that again."
+                )
+            else:
+                st.error("The hosted Coach is temporarily unavailable.")
         else:
             st.error(f"Coach call failed: {exc}")
     st.stop()
