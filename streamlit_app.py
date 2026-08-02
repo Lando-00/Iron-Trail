@@ -244,7 +244,7 @@ recent = (
 )
 recent["Duration (min)"] = recent["Duration (min)"].fillna(0).round(0).astype(int)
 recent["Start"] = pd.to_datetime(recent["Start"]).dt.strftime("%Y-%m-%d %H:%M")
-st.dataframe(recent, use_container_width=True, hide_index=True)
+ui.table(recent, empty_text="No workouts logged yet.")
 
 with st.expander("Unmapped exercises (add to data/lookups/exercise_muscle_map.csv)"):
     unmapped = (
@@ -256,7 +256,7 @@ with st.expander("Unmapped exercises (add to data/lookups/exercise_muscle_map.cs
     if unmapped.empty:
         st.success("All exercises mapped.")
     else:
-        st.dataframe(unmapped, use_container_width=True, hide_index=True)
+        ui.table(unmapped)
         st.caption(
             f"{len(unmapped)} unmapped exercises across {unmapped['Set count'].sum()} sets — "
             "these still appear in raw stats but are skipped in muscle and movement breakdowns."

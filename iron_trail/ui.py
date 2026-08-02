@@ -11,6 +11,7 @@ import math
 import re
 from collections.abc import Iterable
 
+import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
@@ -468,6 +469,59 @@ h3 { font-size: 15px; color: var(--it-text-soft); font-weight: 600; }
 /* Dataframes get the mono treatment */
 [data-testid="stDataFrame"] table { font-family: 'JetBrains Mono', monospace !important; font-size: 12px; }
 
+/* Tables. `st.dataframe` paints its cells onto a canvas using the colours
+   baked into `.streamlit/config.toml` at startup, so no stylesheet can reach
+   them and every palette but the configured one shows a dark slab on a light
+   page. ui.table() renders plain HTML that reads the same palette variables
+   as the rest of the app instead. */
+.it-table-wrap {
+    border: 1px solid rgba(var(--it-overlay-rgb), 0.10);
+    border-radius: 12px;
+    background: rgba(var(--it-overlay-rgb), 0.02);
+    overflow: auto;
+    max-height: 26rem;
+    margin: 8px 0 4px;
+}
+.it-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--it-text-primary);
+}
+.it-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    text-align: left;
+    font-family: 'Inter Tight', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.10em;
+    text-transform: uppercase;
+    color: var(--it-text-secondary);
+    background: var(--it-bg);
+    /* Streamlit's base stylesheet rules every th/td with a literal grid colour
+       taken from the config theme, which shows as stale hairlines. */
+    border: 0;
+    border-bottom: 1px solid rgba(var(--it-overlay-rgb), 0.14);
+    padding: 10px 14px;
+    white-space: nowrap;
+}
+.it-table td {
+    padding: 9px 14px;
+    border: 0;
+    border-top: 1px solid rgba(var(--it-overlay-rgb), 0.06);
+    white-space: nowrap;
+}
+.it-table tbody tr:hover td { background: rgba(var(--it-overlay-rgb), 0.05); }
+.it-table th.num, .it-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.it-table-empty {
+    color: var(--it-text-muted);
+    font-size: 13px;
+    padding: 14px 16px;
+}
+
 /* Strip the Streamlit chrome we don't want, but keep the sidebar toggle.
    The expand-sidebar button lives inside <header>, and Streamlit auto-collapses
    the sidebar on narrow screens — hiding the header outright would strand
@@ -593,6 +647,58 @@ textarea::placeholder {
     color: var(--it-text-primary) !important;
 }
 
+/* st.text draws its span with the configured ink, and st.code brings both a
+   slab and a dark syntax theme — all three are invisible on a light palette,
+   and all three sit inside the beta-access panels. */
+[data-testid="stText"],
+[data-testid="stText"] span {
+    color: var(--it-text-primary) !important;
+}
+[data-testid="stCode"] pre,
+[data-testid="stCode"] code,
+[data-testid="stCode"] .token {
+    background: transparent;
+    color: var(--it-text-primary) !important;
+}
+[data-testid="stCode"] pre {
+    background: rgba(var(--it-overlay-rgb), 0.05) !important;
+    border: 1px solid rgba(var(--it-overlay-rgb), 0.12) !important;
+}
+[data-testid="stCode"] .token.comment { color: var(--it-text-muted) !important; }
+[data-testid="stCode"] .token.string { color: var(--it-tint-green) !important; }
+[data-testid="stCode"] .token.number { color: var(--it-tint-blue) !important; }
+[data-testid="stCode"] .token.keyword,
+[data-testid="stCode"] .token.function { color: var(--it-tint-gold) !important; }
+
+/* The checkbox square is the one control with no testid of its own — it is
+   the only unlabelled direct div child of the widget's label. */
+[data-testid="stCheckbox"] label > div:not([data-testid]) {
+    background: rgba(var(--it-overlay-rgb), 0.05) !important;
+    border-color: rgba(var(--it-overlay-rgb), 0.30) !important;
+}
+[data-testid="stCheckbox"] label:has(input:checked) > div:not([data-testid]) {
+    background: var(--it-accent-gold) !important;
+    border-color: var(--it-accent-gold) !important;
+}
+
+/* Radio options keep the configured ink for their labels and paint the
+   unselected dot in the configured page colour, so on a light palette the
+   choices read as pale grey next to a row of black dots. The dot is the only
+   empty div inside an option, which is the one handle Streamlit leaves. */
+[data-testid="stRadioOption"] [data-testid="stMarkdownContainer"],
+[data-testid="stRadioOption"] [data-testid="stMarkdownContainer"] p {
+    color: var(--it-text-primary) !important;
+}
+[data-testid="stRadioOption"] div:has(> div:empty) {
+    background: rgba(var(--it-overlay-rgb), 0.20) !important;
+}
+[data-testid="stRadioOption"] div > div:empty {
+    background: var(--it-bg) !important;
+}
+[data-testid="stRadioOption"]:has(input:checked) div > div:empty {
+    background: var(--it-accent-gold) !important;
+}
+
 /* Popover menus render in a portal outside .stApp. */
 [data-baseweb="popover"] [role="listbox"],
 [data-baseweb="menu"],
@@ -607,6 +713,46 @@ textarea::placeholder {
 [data-testid="stSidebarCollapseButton"] svg,
 [data-testid="stSidebarCollapseButton"] [data-testid="stIconMaterial"] {
     color: var(--it-text-secondary) !important;
+}
+
+/* Expander headers take the configured secondaryBackgroundColor, and only
+   Streamlit's hover rule clears it — so on any other palette the bar sat
+   black with the palette's own (dark) ink on it, and "fixed itself" under the
+   cursor. Give the header a palette surface in both states so it stays
+   readable, and keep the frame and body on palette too.
+   This is the same widget behind the sidebar's beta-access togglers. */
+[data-testid="stExpander"] details,
+[data-testid="stExpander"] [data-testid="stExpanderDetails"] {
+    background: transparent !important;
+    color: var(--it-text-primary) !important;
+}
+[data-testid="stExpander"] details {
+    border: 1px solid rgba(var(--it-overlay-rgb), 0.10) !important;
+    border-radius: 12px !important;
+}
+[data-testid="stExpander"] summary {
+    background: rgba(var(--it-overlay-rgb), 0.04) !important;
+    color: var(--it-text-primary) !important;
+    border-radius: 12px !important;
+}
+[data-testid="stExpander"] details[open] > summary {
+    border-bottom: 1px solid rgba(var(--it-overlay-rgb), 0.10) !important;
+    border-end-start-radius: 0 !important;
+    border-end-end-radius: 0 !important;
+}
+[data-testid="stExpander"] summary:hover {
+    background: rgba(var(--it-overlay-rgb), 0.09) !important;
+}
+[data-testid="stExpander"] summary:hover [data-testid="stMarkdownContainer"],
+[data-testid="stExpander"] summary:hover p {
+    color: var(--it-accent-gold) !important;
+}
+[data-testid="stExpander"] summary [data-testid="stMarkdownContainer"],
+[data-testid="stExpander"] summary p,
+[data-testid="stExpander"] summary [data-testid="stIconMaterial"],
+[data-testid="stExpander"] summary svg {
+    color: var(--it-text-primary) !important;
+    fill: currentColor !important;
 }
 
 
@@ -669,6 +815,13 @@ textarea::placeholder {
     .it-hero-subtitle { font-size: 13px; max-width: none; }
 
     .it-review-card { padding: 20px 18px; }
+
+    /* A three-column table is wider than a phone, so the wrapper scrolls
+       sideways rather than the columns crushing together. */
+    .it-table { font-size: 11px; }
+    .it-table th { padding: 9px 10px; }
+    .it-table td { padding: 8px 10px; }
+    .it-table-wrap { max-height: 22rem; }
 }
 </style>
 """
@@ -805,6 +958,60 @@ def hero(label: str, value: str, subtitle: str = "", unit: str = "") -> None:
 
 def section_title(text: str) -> None:
     st.markdown(f'<div class="it-section-title">{_escape(text)}</div>', unsafe_allow_html=True)
+
+
+def _cell_text(value: object) -> str:
+    """One table cell as display text, with the float noise trimmed off."""
+    try:
+        if value is None or pd.isna(value):
+            return "—"
+    except (TypeError, ValueError):  # array-likes have no single truth value
+        pass
+    if isinstance(value, float):
+        return f"{value:,.2f}".rstrip("0").rstrip(".")
+    return str(value)
+
+
+def _table_markup(frame: pd.DataFrame, empty_text: str) -> str:
+    if frame.empty:
+        return f'<div class="it-table-wrap"><div class="it-table-empty">{_escape(empty_text)}</div></div>'
+
+    numeric = {
+        column for column in frame.columns if pd.api.types.is_numeric_dtype(frame[column])
+    }
+    head = "".join(
+        f'<th class="num">{_escape(column)}</th>'
+        if column in numeric
+        else f"<th>{_escape(column)}</th>"
+        for column in frame.columns
+    )
+    rows = []
+    for record in frame.to_dict(orient="records"):
+        cells = "".join(
+            f'<td class="num">{_escape(_cell_text(record[column]))}</td>'
+            if column in numeric
+            else f"<td>{_escape(_cell_text(record[column]))}</td>"
+            for column in frame.columns
+        )
+        rows.append(f"<tr>{cells}</tr>")
+    body = "".join(rows)
+    return (
+        '<div class="it-table-wrap"><table class="it-table">'
+        f"<thead><tr>{head}</tr></thead><tbody>{body}</tbody>"
+        "</table></div>"
+    )
+
+
+def table(frame: pd.DataFrame, *, empty_text: str = "Nothing to show yet.") -> None:
+    """Palette-aware stand-in for ``st.dataframe``.
+
+    ``st.dataframe`` draws its cells on a canvas using the colours baked into
+    ``.streamlit/config.toml`` when the server starts, so it cannot follow a
+    per-session palette and renders a dark slab on the light themes. This
+    renders the same rows as escaped HTML that inherits the ``--it-*``
+    variables, so the table tracks whatever palette the session picked.
+    """
+    st.markdown(_table_markup(frame, empty_text), unsafe_allow_html=True)
 
 
 def callout(kind: str, message: str, icon: str = "") -> None:

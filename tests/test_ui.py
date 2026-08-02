@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 
+import pandas as pd
 import plotly.graph_objects as go
 import pytest
 
@@ -88,6 +89,74 @@ def test_sparkline_svg_markup_renders_safe_polyline() -> None:
     assert "<script" not in markup
     assert "0.00,28.00" in markup
     assert "100.00,16.00" in markup
+
+
+def test_expander_header_is_readable_without_the_cursor_on_it() -> None:
+    """Streamlit paints the expander header with the config's
+    secondaryBackgroundColor and only clears it on hover, so on every other
+    palette the bar sat black under the palette's own dark ink and only
+    "fixed itself" when hovered. It has to carry a palette surface in the
+    resting state too — this is also the sidebar's beta-access toggler."""
+    css = ui._CSS
+
+    resting = css.split('[data-testid="stExpander"] summary {')[1].split("}")[0]
+    assert "rgba(var(--it-overlay-rgb)" in resting
+    assert "var(--it-text-primary)" in resting
+    assert '[data-testid="stExpander"] summary:hover' in css
+    assert '[data-testid="stExpander"] details[open] > summary' in css
+
+
+def test_config_baked_widget_chrome_is_repointed_at_the_palette() -> None:
+    """`.streamlit/config.toml` freezes textColor/secondaryBackgroundColor into
+    emotion classes at server start, so these controls kept dark-theme ink and
+    slabs on every other palette — st.text and st.code sit inside the sidebar's
+    beta-access panels, and the radio labels drive the Volume page."""
+    css = ui._CSS
+
+    for selector in (
+        '[data-testid="stText"] span',
+        '[data-testid="stCode"] pre',
+        '[data-testid="stCheckbox"] label > div:not([data-testid])',
+        '[data-testid="stRadioOption"] [data-testid="stMarkdownContainer"] p',
+        '[data-testid="stRadioOption"] div > div:empty',
+    ):
+        assert selector in css, f"{selector} still uses the baked config colours"
+
+
+def test_table_markup_is_escaped_and_palette_driven() -> None:
+    """`st.dataframe` draws onto a canvas with the colours baked into
+    config.toml at startup, so it cannot follow a per-session palette. The
+    HTML replacement must stay escaped — workout titles come from user CSVs."""
+    frame = pd.DataFrame(
+        {"Workout": ["<script>alert(1)</script>"], "Duration (min)": [80]}
+    )
+
+    markup = ui._table_markup(frame, "nothing here")
+
+    assert '<table class="it-table">' in markup
+    assert "<script>" not in markup
+    assert "&lt;script&gt;" in markup
+    # Numeric columns are right-aligned; text columns are not.
+    assert '<th class="num">Duration (min)</th>' in markup
+    assert "<th>Workout</th>" in markup
+    assert '<td class="num">80</td>' in markup
+    assert ".it-table" in ui._CSS
+
+
+def test_table_markup_reports_an_empty_frame_instead_of_an_empty_shell() -> None:
+    markup = ui._table_markup(pd.DataFrame(columns=["Exercise"]), "All exercises mapped.")
+
+    assert "it-table-empty" in markup
+    assert "All exercises mapped." in markup
+    assert "<tbody>" not in markup
+
+
+def test_table_cells_trim_float_noise_and_show_missing_values() -> None:
+    assert ui._cell_text(80.0) == "80"
+    assert ui._cell_text(80.5) == "80.5"
+    assert ui._cell_text(None) == "—"
+    assert ui._cell_text(float("nan")) == "—"
+    assert ui._cell_text("Pull Day") == "Pull Day"
 
 
 def test_css_holds_no_colour_literals() -> None:
