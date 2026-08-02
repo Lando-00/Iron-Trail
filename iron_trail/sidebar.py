@@ -14,9 +14,12 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from . import auth, config, ingest, runtime, theme, ui
+from . import auth, config, ingest, runtime, theme, ui, user_profile
 from .cloud_storage import CloudStorageError, get_dataset_repository
 from .uploads import UploadValidationError
+
+_BODY_WEIGHT_KEY = "it_body_weight"
+_BODY_WEIGHT_SAVED_KEY = "it_body_weight_saved"
 
 
 def _csv_choices() -> list[str]:
@@ -35,6 +38,67 @@ def _load_from_path(path: str, body_weight_kg: float) -> pd.DataFrame:
 def _load_from_bytes(content: bytes, _filename: str, body_weight_kg: float) -> pd.DataFrame:
     """Parse uploaded bytes without placing private data in Streamlit's global cache."""
     return ingest.load_and_clean(io.BytesIO(content), body_weight_kg=body_weight_kg)
+
+
+def _body_weight_input(help_text: str) -> float:
+    """Bodyweight widget bound to session state so page navigation cannot reset it."""
+    return st.number_input(
+        "Bodyweight (kg)",
+        step=0.5,
+        min_value=user_profile.MIN_BODY_WEIGHT_KG,
+        max_value=user_profile.MAX_BODY_WEIGHT_KG,
+        key=_BODY_WEIGHT_KEY,
+        help=help_text,
+    )
+
+
+def _seed_body_weight(initial: float) -> None:
+    """Prime the widget once per session; later reruns reuse the stored value."""
+    if _BODY_WEIGHT_KEY in st.session_state:
+        return
+    st.session_state[_BODY_WEIGHT_KEY] = initial
+    st.session_state[_BODY_WEIGHT_SAVED_KEY] = initial
+
+
+def _render_local_body_weight() -> float:
+    _seed_body_weight(user_profile.load_local_body_weight())
+    weight = _body_weight_input(
+        "Powers bodyweight + assisted-exercise load calculations and BW-relative "
+        "badges. Saved on this machine for next time."
+    )
+    if st.session_state.get(_BODY_WEIGHT_SAVED_KEY) != weight:
+        try:
+            user_profile.save_local_body_weight(weight)
+        except (OSError, user_profile.ProfileError) as exc:
+            st.warning(f"Could not save your bodyweight: {exc}")
+        else:
+            st.session_state[_BODY_WEIGHT_SAVED_KEY] = weight
+    return weight
+
+
+def _render_cloud_body_weight(repository, user_id: str) -> float:
+    if _BODY_WEIGHT_KEY not in st.session_state:
+        try:
+            stored = repository.get_profile(user_id)
+        except CloudStorageError:
+            stored = None
+        _seed_body_weight(
+            stored.body_weight_kg if stored else user_profile.default_body_weight()
+        )
+
+    weight = _body_weight_input(
+        "Used for bodyweight exercises and relative-strength achievements. "
+        "Saved to your account for next time."
+    )
+    if st.session_state.get(_BODY_WEIGHT_SAVED_KEY) != weight:
+        try:
+            repository.save_profile(user_id, weight)
+        except (CloudStorageError, user_profile.ProfileError) as exc:
+            st.warning(f"{exc} Using {weight:g} kg for this session only.")
+        else:
+            st.session_state[_BODY_WEIGHT_SAVED_KEY] = weight
+            st.caption("Bodyweight saved to your account.")
+    return weight
 
 
 def render_theme_picker() -> None:
@@ -111,13 +175,7 @@ def _render_local_data_source() -> tuple[pd.DataFrame, str, float]:
         help="Files in `data/raw/` plus the bundled sample.",
     )
 
-    body_weight = st.number_input(
-        "Bodyweight (kg)",
-        value=float(config.BODY_WEIGHT_KG),
-        step=0.5,
-        min_value=30.0,
-        help="Powers bodyweight + assisted-exercise load calculations and BW-relative badges.",
-    )
+    body_weight = _render_local_body_weight()
 
     if has_upload:
         df = _load_from_bytes(
@@ -178,13 +236,7 @@ def _render_cloud_data_source() -> tuple[pd.DataFrame, str, float]:
                 st.session_state.pop(key, None)
             st.rerun()
 
-    body_weight = st.number_input(
-        "Bodyweight (kg)",
-        value=float(config.BODY_WEIGHT_KG),
-        step=0.5,
-        min_value=30.0,
-        help="Used for bodyweight exercises and relative-strength achievements.",
-    )
+    body_weight = _render_cloud_body_weight(repository, user.user_id)
 
     if has_upload:
         content = st.session_state["it_upload_bytes"]
@@ -328,9 +380,9 @@ def _render_cloud_data_controls(user_id: str, repository) -> None:
             )
 
         confirm = st.checkbox(
-            "I understand this removes all datasets from active IronTrail access; "
-            "deleted blobs may remain recoverable by privileged Azure operators for "
-            "up to 7 days."
+            "I understand this removes all datasets and my saved bodyweight from "
+            "active IronTrail access; deleted blobs may remain recoverable by "
+            "privileged Azure operators for up to 7 days."
         )
         if st.button(
             "Delete all active saved data",
@@ -340,4 +392,6 @@ def _render_cloud_data_controls(user_id: str, repository) -> None:
         ):
             repository.delete_all(user_id)
             st.session_state.pop("it_data_export_bytes", None)
+            for key in (_BODY_WEIGHT_KEY, _BODY_WEIGHT_SAVED_KEY):
+                st.session_state.pop(key, None)
             st.rerun()

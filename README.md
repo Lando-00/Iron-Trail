@@ -248,8 +248,9 @@ Commands:
 ### Default bodyweight
 
 Edit `BODY_WEIGHT_KG` in [`iron_trail/config.py`](iron_trail/config.py) to
-change the value the sidebar starts at. The sidebar input is authoritative
-at runtime — this is just the default.
+change the value the sidebar starts at before you have saved one. Whatever you
+set in the sidebar is saved and wins from then on — to `data/processed/profile.json`
+when running locally, and to your account when running in cloud mode.
 
 ### Exercise → muscle map
 

@@ -26,9 +26,13 @@ from .auth import (
     User,
     hash_invite_code,
 )
+from .user_profile import UserProfile, normalize_body_weight
 
 _AUTH_PARTITION = "auth"
 _AUTH_STATE_ROW = "state"
+# Reserved RowKey inside a user's dataset partition. Dataset ids are 24 hex
+# characters, so this can never collide with one.
+_PROFILE_ROW = "__profile__"
 _SAFE_FILENAME = re.compile(r"[^A-Za-z0-9._-]+")
 
 logger = logging.getLogger("iron_trail.cloud_storage")
@@ -570,17 +574,63 @@ class AzureDatasetRepository:
     ) -> DatasetRecord:
         return _save_single_dataset(self, user_id, content, filename, dataframe)
 
+    def get_profile(self, user_id: str) -> UserProfile | None:
+        from azure.core.exceptions import AzureError, ResourceNotFoundError
+
+        try:
+            entity = self._table.get_entity(user_id, _PROFILE_ROW)
+        except ResourceNotFoundError:
+            return None
+        except AzureError as exc:
+            raise CloudStorageError("Unable to read your saved profile.") from exc
+        try:
+            return _entity_to_profile(entity)
+        except (KeyError, ValueError, TypeError):
+            logger.warning("Discarding unreadable profile entity", exc_info=True)
+            return None
+
+    def save_profile(self, user_id: str, body_weight_kg: float) -> UserProfile:
+        from azure.core.exceptions import AzureError
+        from azure.data.tables import UpdateMode
+
+        record = UserProfile(
+            user_id=user_id,
+            body_weight_kg=normalize_body_weight(body_weight_kg),
+            updated_at=datetime.now(UTC),
+        )
+        try:
+            self._table.upsert_entity(_profile_to_entity(record), mode=UpdateMode.REPLACE)
+        except AzureError as exc:
+            raise CloudStorageError("Unable to save your bodyweight.") from exc
+        return record
+
+    def delete_profile(self, user_id: str) -> None:
+        from azure.core.exceptions import AzureError, ResourceNotFoundError
+
+        try:
+            self._table.delete_entity(user_id, _PROFILE_ROW)
+        except ResourceNotFoundError:
+            return
+        except AzureError as exc:
+            raise CloudStorageError("Unable to delete your saved profile.") from exc
+
     def list_datasets(self, user_id: str) -> list[DatasetRecord]:
         from azure.core.exceptions import AzureError
 
         try:
             entities = list(
-                self._table.query_entities(f"PartitionKey eq '{_odata(user_id)}'")
+                self._table.query_entities(
+                    f"PartitionKey eq '{_odata(user_id)}' and RowKey ne '{_PROFILE_ROW}'"
+                )
             )
         except AzureError as exc:
             raise CloudStorageError("Unable to list saved datasets.") from exc
         records = sorted(
-            (_entity_to_dataset(entity) for entity in entities),
+            (
+                _entity_to_dataset(entity)
+                for entity in entities
+                if str(entity["RowKey"]) != _PROFILE_ROW
+            ),
             key=lambda item: item.created_at,
             reverse=True,
         )
@@ -624,6 +674,7 @@ class AzureDatasetRepository:
         records = self.list_datasets(user_id)
         for record in records:
             self.delete_dataset(user_id, record.dataset_id)
+        self.delete_profile(user_id)
         return len(records)
 
     def export_user_archive(self, user_id: str) -> bytes:
@@ -649,6 +700,7 @@ class AzureDatasetRepository:
             manifest = {
                 "exported_at": datetime.now(UTC).isoformat(),
                 "datasets": [_record_json(record) for record in records],
+                "profile": _profile_json(self.get_profile(user_id)),
                 "missing_blobs": missing,
             }
             archive.writestr("manifest.json", json.dumps(manifest, indent=2))
@@ -701,6 +753,7 @@ class InMemoryDatasetRepository:
         self.records: dict[tuple[str, str], DatasetRecord] = {}
         self.raw: dict[tuple[str, str], bytes] = {}
         self.frames: dict[tuple[str, str], pd.DataFrame] = {}
+        self.profiles: dict[str, UserProfile] = {}
 
     def save_hevy_dataset(
         self,
@@ -736,6 +789,21 @@ class InMemoryDatasetRepository:
         dataframe: pd.DataFrame,
     ) -> DatasetRecord:
         return _save_single_dataset(self, user_id, content, filename, dataframe)
+
+    def get_profile(self, user_id: str) -> UserProfile | None:
+        return self.profiles.get(user_id)
+
+    def save_profile(self, user_id: str, body_weight_kg: float) -> UserProfile:
+        record = UserProfile(
+            user_id=user_id,
+            body_weight_kg=normalize_body_weight(body_weight_kg),
+            updated_at=datetime.now(UTC),
+        )
+        self.profiles[user_id] = record
+        return record
+
+    def delete_profile(self, user_id: str) -> None:
+        self.profiles.pop(user_id, None)
 
     def list_datasets(self, user_id: str) -> list[DatasetRecord]:
         now = datetime.now(UTC)
@@ -773,6 +841,7 @@ class InMemoryDatasetRepository:
         records = self.list_datasets(user_id)
         for record in records:
             self.delete_dataset(user_id, record.dataset_id)
+        self.delete_profile(user_id)
         return len(records)
 
     def export_user_archive(self, user_id: str) -> bytes:
@@ -795,6 +864,7 @@ class InMemoryDatasetRepository:
                 json.dumps(
                     {
                         "datasets": [_record_json(record) for record in records],
+                        "profile": _profile_json(self.get_profile(user_id)),
                         "missing_blobs": [],
                     },
                     indent=2,
@@ -912,6 +982,32 @@ def _record_json(record: DatasetRecord) -> dict[str, Any]:
     for key in ("created_at", "raw_expires_at", "normalized_expires_at"):
         data[key] = data[key].isoformat()
     return data
+
+
+def _profile_to_entity(record: UserProfile) -> dict[str, Any]:
+    return {
+        "PartitionKey": record.user_id,
+        "RowKey": _PROFILE_ROW,
+        "bodyWeightKg": float(record.body_weight_kg),
+        "updatedAt": record.updated_at,
+    }
+
+
+def _entity_to_profile(entity: Any) -> UserProfile:
+    return UserProfile(
+        user_id=str(entity["PartitionKey"]),
+        body_weight_kg=normalize_body_weight(entity["bodyWeightKg"]),
+        updated_at=_as_utc(entity["updatedAt"]),
+    )
+
+
+def _profile_json(record: UserProfile | None) -> dict[str, Any] | None:
+    if record is None:
+        return None
+    return {
+        "body_weight_kg": record.body_weight_kg,
+        "updated_at": record.updated_at.isoformat(),
+    }
 
 
 def _as_utc(value: Any) -> datetime:
