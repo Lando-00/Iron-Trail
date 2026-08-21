@@ -4,7 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from iron_trail.coach.providers import Message, TokenUsage
+from iron_trail import runtime
+from iron_trail.coach.providers import Message, TokenUsage, azure_foundry
 from iron_trail.coach.providers.azure_foundry import (
     AzureFoundryProvider,
     EmptyAssistantResponseError,
@@ -79,7 +80,7 @@ def test_foundry_provider_reads_cloud_controls_from_environment(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("IRONTRAIL_AI_REASONING_EFFORT", "minimal")
-    monkeypatch.setenv("IRONTRAIL_AI_MAX_RETRIES", "0")
+    monkeypatch.setenv("IRONTRAIL_AI_MAX_RETRIES", "2")
     monkeypatch.setenv("IRONTRAIL_AI_MAX_OUTPUT_TOKENS", "1200")
     client = FakeClient()
 
@@ -91,9 +92,60 @@ def test_foundry_provider_reads_cloud_controls_from_environment(
     provider.chat([Message("user", "Format this synthetic object.")])
 
     assert provider.reasoning_effort == "minimal"
-    assert provider.max_retries == 0
+    assert provider.max_retries == 2
     assert provider.max_output_tokens == 1200
     assert client.completions.kwargs["reasoning_effort"] == "minimal"
+
+
+def test_foundry_provider_preserves_explicit_zero_retries() -> None:
+    provider = AzureFoundryProvider(
+        endpoint="https://example.openai.azure.com",
+        deployment="gpt-5-mini",
+        client=FakeClient(),
+        max_retries=0,
+    )
+
+    assert provider.max_retries == 0
+
+
+@pytest.mark.parametrize("value", ["-1", "many"])
+def test_foundry_provider_rejects_invalid_retry_environment(
+    monkeypatch,
+    value: str,
+) -> None:
+    monkeypatch.setenv("IRONTRAIL_AI_MAX_RETRIES", value)
+
+    with pytest.raises(runtime.ConfigurationError, match="IRONTRAIL_AI_MAX_RETRIES"):
+        AzureFoundryProvider(
+            endpoint="https://example.openai.azure.com",
+            deployment="gpt-5-mini",
+            client=FakeClient(),
+        )
+
+
+def test_foundry_client_receives_retry_configuration(monkeypatch) -> None:
+    captured = {}
+
+    monkeypatch.setattr(azure_foundry, "azure_credential", lambda: "credential")
+    monkeypatch.setattr(
+        "azure.identity.get_bearer_token_provider",
+        lambda credential, scope: ("token-provider", credential, scope),
+    )
+
+    def _client(**kwargs):
+        captured.update(kwargs)
+        return FakeClient()
+
+    monkeypatch.setattr("openai.AzureOpenAI", _client)
+
+    AzureFoundryProvider(
+        endpoint="https://example.openai.azure.com",
+        deployment="gpt-5-mini",
+        max_retries=2,
+    )
+
+    assert captured["max_retries"] == 2
+    assert captured["azure_ad_token_provider"][0] == "token-provider"
 
 
 def test_foundry_provider_tracks_usage_before_empty_response_error() -> None:

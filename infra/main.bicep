@@ -21,6 +21,14 @@ param reviewDeploymentName string = ''
 @description('Deployment used for the Ask Coach chat. Defaults to modelDeploymentName.')
 param chatDeploymentName string = ''
 
+@allowed([
+  '0'
+  '1'
+  '2'
+])
+@description('Maximum OpenAI SDK retries for transient hosted Coach failures.')
+param aiMaxRetries string = '2'
+
 @description('Microsoft identity application client ID used by Container Apps Easy Auth.')
 param aadClientId string
 
@@ -133,6 +141,7 @@ module application './modules/application.bicep' = if (!stageC2PatchEnabled) {
     modelDeploymentName: modelDeploymentName
     reviewDeploymentName: empty(reviewDeploymentName) ? modelDeploymentName : reviewDeploymentName
     chatDeploymentName: empty(chatDeploymentName) ? modelDeploymentName : chatDeploymentName
+    aiMaxRetries: aiMaxRetries
     ownerObjectId: ownerObjectId
     grantOwnerKeyVaultAccess: grantOwnerKeyVaultAccess
     grantOwnerStorageDiagnosticAccess: grantOwnerStorageDiagnosticAccess
@@ -157,6 +166,7 @@ module stageC2Patch './modules/stage_c2_patch.bicep' = if (stageC2PatchEnabled) 
     modelDeploymentName: modelDeploymentName
     reviewDeploymentName: empty(reviewDeploymentName) ? modelDeploymentName : reviewDeploymentName
     chatDeploymentName: empty(chatDeploymentName) ? modelDeploymentName : chatDeploymentName
+    aiMaxRetries: aiMaxRetries
     ownerObjectId: ownerObjectId
     grantOwnerKeyVaultAccess: grantOwnerKeyVaultAccess
     grantOwnerStorageDiagnosticAccess: grantOwnerStorageDiagnosticAccess

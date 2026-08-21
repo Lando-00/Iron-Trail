@@ -18,6 +18,14 @@ param reviewDeploymentName string = ''
 @description('Deployment used for the Ask Coach chat.')
 param chatDeploymentName string = ''
 
+@allowed([
+  '0'
+  '1'
+  '2'
+])
+@description('Maximum OpenAI SDK retries for transient hosted Coach failures.')
+param aiMaxRetries string = '2'
+
 @description('Microsoft identity application client ID.')
 param aadClientId string
 
@@ -480,7 +488,7 @@ module containerApp 'br/public:avm/res/app/container-app:0.23.0' = {
           }
           {
             name: 'IRONTRAIL_AI_MAX_RETRIES'
-            value: '0'
+            value: aiMaxRetries
           }
           {
             name: 'IRONTRAIL_AI_REASONING_EFFORT'

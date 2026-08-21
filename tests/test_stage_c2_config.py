@@ -28,6 +28,15 @@ def test_storage_diagnostic_flag_must_be_boolean_text() -> None:
         validate_config(config)
 
 
+@pytest.mark.parametrize("value", ["-1", "3", "many"])
+def test_ai_retries_are_bounded(value: str) -> None:
+    config = _base()
+    config["IRONTRAIL_AI_MAX_RETRIES"] = value
+
+    with pytest.raises(ValueError, match="AI_MAX_RETRIES"):
+        validate_config(config)
+
+
 def test_google_enabled_requires_complete_web_client_credentials() -> None:
     config = _base()
     config["IRONTRAIL_GOOGLE_AUTH_ENABLED"] = "true"

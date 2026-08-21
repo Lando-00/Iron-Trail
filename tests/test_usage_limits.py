@@ -11,8 +11,8 @@ from iron_trail.usage_limits import (
     CallKind,
     InMemoryUsageRepository,
     LimitedProvider,
-    UsageLimitExceeded,
     UsageLimiter,
+    UsageLimitExceeded,
     UsagePolicy,
     is_pre_billing_error,
 )
@@ -68,6 +68,35 @@ def test_limited_provider_records_actual_usage() -> None:
     assert event.status == "completed"
     assert event.input_tokens == 100
     assert event.output_tokens == 50
+
+
+def test_internal_provider_retries_use_one_usage_reservation() -> None:
+    class InternallyRetryingProvider:
+        name = "internally-retrying"
+
+        def __init__(self) -> None:
+            self.attempts = 0
+            self.last_usage: TokenUsage | None = None
+
+        def chat(self, messages: list[Message], *, timeout: float = 120.0) -> str:
+            # OpenAI SDK retries happen inside this one provider call. The
+            # limiter must see one logical outcome, not one row per attempt.
+            self.attempts = 2
+            self.last_usage = TokenUsage(input_tokens=120, output_tokens=30)
+            return "retried response"
+
+    repo = InMemoryUsageRepository()
+    limiter = UsageLimiter(repo, _policy())
+    inner = InternallyRetryingProvider()
+    provider = LimitedProvider(inner, limiter, "user-a", CallKind.CHAT)
+
+    assert provider.chat([Message("user", "hello")]) == "retried response"
+    assert inner.attempts == 2
+    assert len(repo.events) == 1
+    event = next(iter(repo.events.values()))
+    assert event.status == "completed"
+    assert event.input_tokens == 120
+    assert event.output_tokens == 30
 
 
 def test_daily_limit_fails_closed_before_provider_call() -> None:

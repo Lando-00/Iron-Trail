@@ -18,6 +18,14 @@ param reviewDeploymentName string = ''
 @description('Deployment used for the Ask Coach chat.')
 param chatDeploymentName string = ''
 
+@allowed([
+  '0'
+  '1'
+  '2'
+])
+@description('Maximum OpenAI SDK retries for transient hosted Coach failures.')
+param aiMaxRetries string = '2'
+
 @description('Microsoft identity application client ID.')
 param aadClientId string
 
@@ -106,7 +114,7 @@ var googleAuthConfigured = toLower(googleAuthEnabled) == 'true'
 var authProviders = googleAuthConfigured ? 'aad,google' : 'aad'
 var keyVaultSecretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6'
 var storageTableDataReaderRoleId = '76199698-9eea-4c19-bc75-cec21354c6b6'
-var revisionSuffix = 'c2-${take(uniqueString(containerAppName, googleAuthEnabled, googleClientId, maxUsers), 8)}'
+var revisionSuffix = 'c2-${take(uniqueString(containerAppName, googleAuthEnabled, googleClientId, maxUsers, aiMaxRetries), 8)}'
 var googleIdentityProvider = googleAuthConfigured ? {
   google: {
     enabled: true
@@ -332,7 +340,7 @@ resource stageC2ContainerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'IRONTRAIL_AI_MAX_RETRIES'
-              value: '0'
+              value: aiMaxRetries
             }
             {
               name: 'IRONTRAIL_AI_REASONING_EFFORT'

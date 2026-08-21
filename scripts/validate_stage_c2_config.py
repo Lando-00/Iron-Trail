@@ -7,6 +7,10 @@ from collections.abc import Mapping
 
 def validate_config(environ: Mapping[str, str] | None = None) -> None:
     env = environ or os.environ
+    ai_retries_raw = env.get("IRONTRAIL_AI_MAX_RETRIES", "2").strip()
+    if ai_retries_raw not in {"0", "1", "2"}:
+        raise ValueError("IRONTRAIL_AI_MAX_RETRIES must be 0, 1, or 2.")
+
     storage_diagnostics_raw = env.get(
         "IRONTRAIL_GRANT_OWNER_STORAGE_DIAGNOSTIC_ACCESS", "false"
     ).strip().lower()

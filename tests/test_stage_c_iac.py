@@ -101,7 +101,13 @@ def test_stage_c2_bicep_is_staged_and_fail_closed() -> None:
     assert "name: 'IRONTRAIL_OWNER_OBJECT_ID'" in application
     assert "name: 'IRONTRAIL_AI_REASONING_EFFORT'" in application
     assert "name: 'IRONTRAIL_AI_MAX_RETRIES'" in application
-    assert "value: '0'" in application
+    assert "value: aiMaxRetries" in application
+    assert "value: aiMaxRetries" in patch
+    for template in (main, application, patch):
+        assert "param aiMaxRetries string = '2'" in template
+    assert main.count("aiMaxRetries: aiMaxRetries") == 2
+    assert "${IRONTRAIL_AI_MAX_RETRIES=2}" in parameters
+    assert "maxUsers, aiMaxRetries" in patch
     assert application.count("principalId: managedIdentity.outputs.principalId") == 5
     assert application.count("principalType: 'ServicePrincipal'") >= 5
     assert "clientSecretSettingName: 'google-client-secret'" in application

@@ -234,7 +234,23 @@ def _runner(command, **kwargs):
             "properties": {
                 "latestRevisionName": "ca-irontrail-example--revision",
                 "runningStatus": "Running",
-                "template": {"scale": {"minReplicas": 0, "maxReplicas": 1}},
+                "template": {
+                    "scale": {"minReplicas": 0, "maxReplicas": 1},
+                    "containers": [
+                        {
+                            "env": [
+                                {
+                                    "name": "IRONTRAIL_AI_MAX_RETRIES",
+                                    "value": "2",
+                                },
+                                {
+                                    "name": "PRIVATE_SECRET",
+                                    "secretRef": "private-secret",
+                                },
+                            ]
+                        }
+                    ],
+                },
             }
         }
     else:
@@ -260,12 +276,14 @@ def test_runtime_audit_reports_only_configured_capacity() -> None:
     encoded = json.dumps(report)
 
     assert report["container_app"]["max_replicas"] == 1
+    assert report["container_app"]["ai_max_retries"] == 2
     assert report["foundry_capacity_ktpm"] == {
         "gpt-5-mini": 20,
         "gpt-5.6-luna": 30,
     }
     assert "other-private-deployment" not in encoded
     assert "subscription" not in encoded
+    assert "PRIVATE_SECRET" not in encoded
 
 
 def test_az_cli_failure_does_not_echo_stderr() -> None:

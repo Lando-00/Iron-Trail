@@ -338,13 +338,35 @@ def read_runtime_audit(
     if missing:
         raise AuditError("Foundry did not report every configured model deployment.")
 
-    scale = properties.get("template", {}).get("scale", {})
+    template = properties.get("template")
+    if not isinstance(template, dict):
+        raise AuditError("Container Apps returned invalid template metadata.")
+    scale = template.get("scale")
+    containers = template.get("containers")
+    if not isinstance(scale, dict) or not isinstance(containers, list) or not containers:
+        raise AuditError("Container Apps returned incomplete runtime metadata.")
+    environment = containers[0].get("env")
+    if not isinstance(environment, list):
+        raise AuditError("Container Apps returned invalid environment metadata.")
+    retry_values = [
+        item.get("value")
+        for item in environment
+        if isinstance(item, dict) and item.get("name") == "IRONTRAIL_AI_MAX_RETRIES"
+    ]
+    if len(retry_values) != 1:
+        raise AuditError("Container Apps did not report one AI retry setting.")
+    try:
+        ai_max_retries = int(retry_values[0])
+    except (TypeError, ValueError) as exc:
+        raise AuditError("Container Apps reported an invalid AI retry setting.") from exc
+
     return {
         "container_app": {
             "latest_revision": revision,
             "running_status": str(properties.get("runningStatus", "unknown")),
             "min_replicas": int(scale.get("minReplicas", 0)),
             "max_replicas": int(scale.get("maxReplicas", 0)),
+            "ai_max_retries": ai_max_retries,
         },
         "foundry_capacity_ktpm": dict(sorted(capacities.items())),
     }

@@ -23,6 +23,9 @@
     "chatDeploymentName": {
       "value": "${IRONTRAIL_AI_CHAT_DEPLOYMENT=}"
     },
+    "aiMaxRetries": {
+      "value": "${IRONTRAIL_AI_MAX_RETRIES=2}"
+    },
     "aadClientId": {
       "value": "${IRONTRAIL_AAD_CLIENT_ID}"
     },
