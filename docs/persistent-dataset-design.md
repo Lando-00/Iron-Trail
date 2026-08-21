@@ -90,8 +90,8 @@ has already redeemed a single-use invite, retention limits and one-click
 Setting the flag to `false` restores the original posture with no code change,
 so this remains reversible and auditable.
 
-**Docs to update on rollout:** `.azure/deployment-plan.md` §5 user-data model,
-`README.md` runtime-modes table.
+The current behavior is now reflected in `.azure/deployment-plan.md`,
+`README.md`, `ROADMAP.md`, and `CONTEXT.md`.
 
 ## 4. Encryption (R3)
 

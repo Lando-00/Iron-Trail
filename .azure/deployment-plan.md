@@ -1,11 +1,12 @@
 # IronTrail Azure Deployment Plan
 
 > **Status:** Deployed — Stage C2, five-user ceiling, Microsoft owner plus one
-> enrolled Google member, zero unused invites. Live two-user isolation is not
-> yet proven (2026-08-01).
+> enrolled Google member, zero unused invites. Basic cross-account visibility
+> isolation was accepted on 2026-08-21; the expanded sentinel data-action and
+> suspend/restore matrix has not been executed.
 
 Generated: 2026-07-11  
-Last verified: 2026-07-25
+Last verified: 2026-08-21
 
 ---
 
@@ -21,7 +22,26 @@ account for hosted AI.
 **Initial URL:** Azure-provided `azurecontainerapps.io` hostname. No custom
 domain in the first release.
 
-### Current baseline
+### Current operational state (2026-08-21)
+
+| Item | State |
+|---|---|
+| Active trunk | `feature/azure-hosting`; `main` remains stale |
+| Tests | 301 passing on x64 Python 3.12 |
+| Members | one Microsoft admin, one active Google member, zero active invites |
+| Visibility isolation | owner accepted: Google member could not see owner's saved data |
+| Expanded isolation matrix | sentinel list/load/cache/export/delete and suspend/restore not executed |
+| Persistence | automatic per-user single-slot save; raw 30d, normalized 60d |
+| Owner diagnostics | default-off Table Reader workflow; no standing Storage role or Blob access |
+| Review model | `gpt-5-mini` `2025-08-07`, DataZoneStandard 20K TPM |
+| Chat model | `gpt-5.6-luna` `2026-07-09`, DataZoneStandard 30K TPM, reasoning `high` |
+| Model retries | OpenAI SDK maximum 2 |
+| Web runtime | healthy Container App, min 0 / max 1 |
+
+### Historical baseline (2026-07-11)
+
+The table below records the starting point of the deployment project. It is
+historical evidence, not current state.
 
 | Item | State |
 |---|---|
@@ -66,8 +86,8 @@ Implemented:
 
 Still deferred:
 
-- Canary enrollment, live two-user isolation testing, and external tester
-  invitations (Stage C2).
+- Additional tester enrollment and the optional expanded sentinel/admin
+  acceptance matrix.
 - Samsung Health, Health Connect, Analytics Lab, a custom domain, and private
   networking.
 - Merge to `main` or any public/tester rollout.
@@ -86,7 +106,7 @@ Still deferred:
 | AI location | Sweden Central, EU Data Zone deployment |
 | Resource group | Reuse existing `rg-IronTrail` |
 | Authentication | Microsoft and Google |
-| Persistence default | Session-only; cloud persistence requires explicit opt-in |
+| Persistence default | Automatic per-user single-slot save; configurable session-only fallback |
 | Raw retention | 30 days after opt-in upload |
 | Normalized retention | 60 days |
 | AI budget behavior | Disable hosted AI until the next month when the hard cap is reached |
@@ -173,7 +193,7 @@ Private per-user raw and normalized datasets
 | Dataset files | Blob Storage | StorageV2, Standard_LRS, private containers |
 | Invitations/metadata/usage | Azure Table Storage | Same StorageV2 account |
 | Hosted AI account/project | Existing Microsoft Foundry resources | `irontrail-resource` / `irontrail`, Sweden Central |
-| Hosted AI model | Azure OpenAI deployment | Later Stage B: `gpt-5-mini`, DataZoneStandard, initial 10K TPM |
+| Hosted AI models | Azure OpenAI deployments | `gpt-5-mini` reviews at 20K TPM; `gpt-5.6-luna` chat at 30K TPM |
 | Secrets | Azure Key Vault | Standard |
 | Telemetry | Application Insights | Workspace-based |
 | Logs | Log Analytics workspace | Pay-as-you-go, 30-day retention and low daily cap |
@@ -195,9 +215,9 @@ Private per-user raw and normalized datasets
   provider and principal ID, never a filename or display name.
 - Unknown or uninvited identities can authenticate but cannot enter the
   dashboard or access data.
-- Stage C enables Microsoft login for the owner only. Google OAuth and live
-  cross-user testing are deferred to a later gate; no testers are invited in
-  Stage C.
+- Stage C began with Microsoft owner-only login. Stage C2 now has Google OAuth,
+  one invited member, and owner-accepted basic cross-account visibility
+  isolation.
 
 ### User-data model
 
@@ -210,8 +230,9 @@ Table Datasets: user-partitioned dataset metadata and expiry
 Table AiUsage: per-user daily/monthly counters and actual token usage
 ```
 
-- Session-only is the default. Nothing is written to Azure until the user
-  explicitly selects cloud persistence.
+- Hosted uploads automatically save into the signed-in user's single dataset
+  slot by default. `IRONTRAIL_AUTO_PERSIST_UPLOADS=false` restores the
+  session-only/explicit-save flow without changing local mode.
 - Saved files remain private and are accessed only by the app's managed
   identity.
 - Blob lifecycle rules remove active raw/normalized data after 30/60 days.
@@ -813,8 +834,10 @@ legitimate enrolment rather than a gap in the gate. Verified by reading
 `IronTrailAuth` and `IronTrailData` directly.
 
 **Consequence:** the beta has been running two real identities since
-2026-07-25 with live isolation still unproven. The acceptance steps below are
-therefore outstanding work against production, not a rehearsal.
+2026-07-25. On 2026-08-21 the owner accepted basic application visibility
+isolation after the Google member could not see the owner's saved data. The
+larger sentinel data-action and suspend/restore matrix below was not executed
+and must not be represented as completed evidence.
 
 #### User-ceiling revision (2026-08-01)
 
@@ -829,8 +852,9 @@ approved by the owner.
   the drift predates the 2026-08-01 deployments and its origin is unknown.
   Moving to an explicit five supersedes the discrepancy rather than guessing
   which value was intended.
-- The isolation, suspension, and restoration gates below are **unchanged**.
-  They still block external tester invitations; only the capacity ceiling moved.
+- The expanded sentinel, suspension, and restoration checks below remain
+  available as optional hardening. Basic cross-account visibility is the
+  accepted gate for the current two-member beta.
 
 ### Stage C2 validation checklist
 
@@ -1032,17 +1056,34 @@ Autopilot must stop before:
 - [x] Declare the owner Key Vault grant in IaC instead of a manual assignment.
 - [x] Enrol the Google canary with a single private invite (2026-07-25, one
   invite redeemed, zero unused).
-- [ ] **Outstanding against production** — complete live two-user isolation
-  and suspend/restore acceptance. Two real identities have coexisted since
-  2026-07-25 without this being proven.
-- [ ] Update evidence, commit, and push without merging.
+- [x] Accept basic live visibility isolation (2026-08-21): the signed-in Google
+  member could not see the Microsoft owner's saved data.
+- [ ] Optional expanded hardening — synthetic sentinel list/load/cache/export/
+  delete checks and suspend/restore acceptance were not run.
+- [x] Update evidence, commit, and push without merging to `main`.
 
 ---
 
 ## 13. Validation Proof
 
-The `azure-validate` skill must populate this section before the plan can move
-to `Validated`.
+### Current operational verification (2026-08-21)
+
+| Check | Result |
+|---|---|
+| Theme release | `aefa6a1` pushed/deployed; root and health HTTP 200; 273 tests passed |
+| Basic two-account visibility | Owner accepted: active Google member could not see owner's saved data |
+| Diagnostic RBAC | Exact temporary Storage Table Data Reader grant; no Blob role; assignment revoked after audit |
+| Redacted beta audit | 2 active members, 0 invites, 1 dataset/profile; no identities or workout content emitted |
+| Retention readback | Raw active through 2026-08-31; normalized active through 2026-09-30 |
+| Coach capacity | `gpt-5-mini` 20K TPM; `gpt-5.6-luna` 30K TPM |
+| Coach retries | Container App readback `IRONTRAIL_AI_MAX_RETRIES=2` |
+| Live model smoke | One synthetic review and chat completed; one in-memory ledger outcome per logical call |
+| Current suite | 301 tests passed; changed files Ruff-clean; Bicep and provider what-if passed |
+| Runtime | Healthy revision, 100% latest traffic, min 0 / max 1 |
+
+### Historical validation ledger
+
+The rows below are retained as dated deployment evidence.
 
 | Check | Command run | Result | Timestamp |
 |---|---|---|---|
@@ -1200,17 +1241,17 @@ requests. No retry or further model request was sent.
 
 **The canary is already enrolled.** A Google member has been active since
 2026-07-25 alongside the Microsoft owner, with zero unused invites outstanding.
-Live isolation between them has never been proven, so this is outstanding work
-against production rather than a rehearsal.
+Basic live visibility isolation is accepted: the Google member could not see
+the owner's saved data. Do not rewrite that observation as stronger evidence
+than was collected.
 
-1. Sign in as the Microsoft owner and the Google member at the same time, in
-   separate browser profiles.
-2. Upload `data/sample/stage_c2_owner_sentinel.csv` and
-   `data/sample/stage_c2_google_sentinel.csv` respectively, then prove neither
-   session can list, load, cache, export or delete the other's. The sentinels
-   carry distinct exercise names so a leak is unambiguous.
-3. Suspend the member, prove denial after the bounded cache window, restore
-   without a new invite, and prove retained data is unchanged.
-4. Clean the synthetic data and record the evidence.
+Next operational work:
 
-Issue no further invitations until steps 2 and 3 pass.
+1. Monitor retention, member/invite state, usage, revision health, retries, and
+   Foundry capacity with the default-off diagnostic workflow in
+   `docs/agents/azure-operations.md`.
+2. Back up the reconstructible non-secret AZD environment key names so another
+   local `.azure/beta/.env` loss does not require manual archaeology.
+3. Before a future higher-risk rollout, optionally run the synthetic
+   list/load/cache/export/delete and suspend/restore matrix. Record it only if
+   actually executed.

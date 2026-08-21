@@ -93,13 +93,15 @@ Triggered when CSV re-export becomes the actual blocker.
   the public [Symmetric Strength](https://symmetricstrength.com/) tables so
   every lift gets a "you're in the top X% for your bracket" badge.
 
-## Private Azure beta — Owner-only deployed
+## Private Azure beta — Invite-only deployed
 
 The hosted path keeps the local app intact and adds a separate cloud mode:
 
-- Stage C owner-only access through Microsoft Easy Auth and an owner-bound
-  single-use bootstrap code. Google plus tester invitations are a later gate.
-- Session-only uploads by default; explicit opt-in Blob/Table persistence.
+- Stage C began with owner-only Microsoft Easy Auth and an owner-bound
+  bootstrap code. Stage C2 now enables Microsoft and Google with hashed,
+  single-use tester invitations.
+- Uploads automatically replace the signed-in user's one saved dataset by
+  default; configuration can restore the session-only/explicit-save flow.
 - 30-day raw and 60-day normalized active retention, plus export/delete
   controls and seven-day privileged Blob recovery.
 - A managed-identity Microsoft Foundry provider with per-user allowances and
@@ -111,13 +113,14 @@ The hosted path keeps the local app intact and adds a separate cloud mode:
   fireworks and a server-seeded discovery sequence that reveals sign-in
   without weakening the Easy Auth or application authorization boundary.
 
-Stage C is deployed and live-tested at the Azure-provided URL. Microsoft owner
-login, session-only isolation, opt-in persistence, export, delete-selected,
-Delete All, lifecycle recovery, Foundry reviews, monitoring, RBAC, and cost
-guardrails have passed. The final landing page also passed live wrong-sequence,
-successful-reveal, mobile, reduced-motion, and owner-login acceptance. Google
-OAuth, tester invitations, and live two-user isolation remain the mandatory
-Stage C2 gate before expanding access.
+Stage C2 is deployed and live-tested at the Azure-provided URL with one
+Microsoft owner, one invited Google member, a five-user ceiling, and zero
+unused invites. Persistence, export, delete-selected, Delete All, lifecycle
+recovery, Foundry, monitoring, RBAC, and cost guardrails have passed. Basic
+cross-account visibility isolation is owner-accepted: the Google member could
+not see the owner's saved data. The larger synthetic
+list/load/cache/export/delete and suspend/restore matrix remains optional
+expanded hardening and is not represented as completed evidence.
 
 ## Other ideas
 

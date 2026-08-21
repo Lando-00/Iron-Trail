@@ -102,7 +102,7 @@ On macOS / Linux, swap `Activate.ps1` for `source .venv/bin/activate`.
 | Mode | Default | Data and AI behavior |
 |---|---|---|
 | `local` | Yes | Local CSV picker/upload, optional Vault filesystem writeback, Copilot SDK or mock Coach |
-| `cloud` | No | Easy Auth identity gate, one-time invites, session-only upload by default, opt-in Azure storage, Foundry Coach with hard usage limits |
+| `cloud` | No | Easy Auth identity gate, one-time invites, automatic single-slot Azure save by default (configurable), Foundry Coach with hard usage limits |
 
 Set `IRONTRAIL_MODE=cloud` only in the prepared Azure container environment.
 Cloud mode deliberately removes server filesystem/Vault path inputs. Markdown,
@@ -307,11 +307,11 @@ expander on the Overview page — add a row for each.
 - Uploaded bytes stay in the local Streamlit session.
 - Vault writeback is explicit and targets a path you choose.
 
-**Deployed Azure owner-only beta**
+**Deployed Azure private beta**
 
-- Stage C uses Microsoft Entra ID for the assigned owner. Google and tester
-  invitations remain deferred.
-- The live owner-only beta is available at
+- Microsoft Entra ID and Google are enabled. The assigned owner and one invited
+  Google member are enrolled; there are zero unused invitations.
+- The live invite-only beta is available at
   <https://ca-irontrail-t5padq.ambitiousbush-1b702384.northeurope.azurecontainerapps.io>.
 - Anonymous visitors see a **Private Beta in Progress** launch screen with
   reduced-motion-aware fireworks and a server-seeded five-step discovery
@@ -319,7 +319,10 @@ expander on the Overview page — add a row for each.
   Easy Auth, owner assignment, invite validation, or application authorization.
 - Storage keys are partitioned by an opaque ID derived from the immutable
   provider principal, not display name or filename.
-- Uploads remain session-only unless the user selects **Save privately**.
+- Uploads automatically replace the signed-in user's one saved dataset by
+  default. The deployment can restore the session-only/explicit-save flow with
+  `IRONTRAIL_AUTO_PERSIST_UPLOADS=false`.
+- Bodyweight is saved per account and remains isolated from other users.
 - Active raw files expire after 30 days; active normalized data expires after
   60 days. Azure Blob soft delete permits privileged recovery for seven
   additional days (37/67 days maximum).
@@ -346,13 +349,14 @@ expander on the Overview page — add a row for each.
 
 ## Deployment — Azure private beta
 
-The owner-only beta is deployed through Azure Developer CLI + Bicep:
+The invite-only beta is deployed through Azure Developer CLI + Bicep:
 
 - Azure Container Apps Consumption, scale-to-zero, maximum one replica.
 - Private Blob/Table storage with managed identity and lifecycle policies.
 - Container Apps Easy Auth plus hashed single-use invite codes.
 - Existing Microsoft Foundry account/project, with the model deployment
-  configured separately.
+  configured separately: `gpt-5-mini` reviews at 20K TPM and
+  `gpt-5.6-luna` chat at 30K TPM with two bounded SDK retries.
 - Application Insights + Log Analytics and a EUR 25 budget ceiling.
 
 The container image pins its base by digest and installs dependencies from
@@ -369,10 +373,14 @@ python scripts/lock_dependencies.py --check   # verify it is current
 
 See [`.azure/deployment-plan.md`](.azure/deployment-plan.md) for the exact
 architecture, phased approvals, cost assumptions, and hard-stop conditions.
-Stage C live acceptance is complete. The current release boundary remains one
-assigned Microsoft owner, no Google login, no testers, and no merge to `main`.
-The final private-beta landing page has also passed live wrong-sequence,
-successful-reveal, mobile, reduced-motion, and owner-login acceptance.
+Stage C2 is live with one Microsoft owner, one invited Google member, a
+five-user ceiling, and zero unused invites. The owner accepted basic
+cross-account visibility isolation after the Google member could not see the
+owner's saved data. The expanded synthetic sentinel/export/delete/cache and
+suspend/restore matrix has not been claimed as executed. The final private-beta
+landing page also passed live wrong-sequence, successful-reveal, mobile,
+reduced-motion, and owner-login acceptance. `feature/azure-hosting` remains the
+de-facto trunk; it has not been merged to stale `main`.
 
 ## Roadmap
 
@@ -381,7 +389,7 @@ See [`ROADMAP.md`](./ROADMAP.md). TL;DR:
 - **Phase 1 — Done.** The dashboard you see in the screenshots above.
 - **Phase 2 — AI Training Coach.** Weekly LLM-written review note in the
   vault.
-- **Private beta — owner-only deployed.** Authentication, storage isolation,
+- **Private beta — invite-only deployed.** Authentication, storage isolation,
   Foundry, usage limits, retention, export/deletion, and Azure operations are
   live-tested.
 - **Cross-source.** Samsung Health recovery context, then an Android Health

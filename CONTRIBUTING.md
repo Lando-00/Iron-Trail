@@ -24,6 +24,12 @@ you spend time on it. The project has opinions about what it does and
 doesn't want to be (see [`ROADMAP.md`](./ROADMAP.md) and the non-goals
 section of the project plan).
 
+Before a larger contribution, read [`CONTEXT.md`](./CONTEXT.md) for domain
+vocabulary and boundaries, then [`ROADMAP.md`](./ROADMAP.md) for deliberately
+deferred work. Agent-assisted contributors should also follow
+[`AGENTS.md`](./AGENTS.md) and the focused guides under
+[`docs/agents/`](./docs/agents/).
+
 ## Style
 
 - **Python.** `ruff` config in `pyproject.toml`, line length 100,
@@ -35,6 +41,10 @@ section of the project plan).
   rendering primitives live in `iron_trail/ui.py`.
 - **Tests.** Run `python -m pytest -q` and `ruff check .`. For deployment
   changes, also build the Docker image and compile the Bicep entry point.
+  There is no CI, and `ruff check .` has a pre-existing non-zero baseline of
+  errors across the repo — verify the files you changed don't add new
+  violations rather than mass-reformatting or fixing unrelated pre-existing
+  errors.
 
 ## Don't
 

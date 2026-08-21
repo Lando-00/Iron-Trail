@@ -62,33 +62,13 @@ Two details worth keeping:
   different principal, a broader role (Key Vault Administrator), `Delete`,
   `Modify`, and a missing expected owner.
 
-### ⚠️ Required migration step before the next provision
+### Migration completed
 
-The manual assignment created during recovery has a **random** name:
-
-```
-308855db-24a3-4a70-afd2-8743390715d8   Key Vault Secrets User   User   9f2b1274-…
-```
-
-Bicep uses a **deterministic** `guid(vaultId, ownerObjectId, roleId)` name.
-Azure treats a role assignment as unique per *(scope, principal, role)*, so
-creating the declared one while the manual one still exists returns
-**`RoleAssignmentExists` (409)** and the deployment fails.
-
-Delete the manual assignment first — the template will recreate it:
-
-```powershell
-$sub = "de3679a8-d52d-42bd-9d7c-f7bed44ffc6f"
-$kv  = "kv-irontrail-t5padq"
-$scope = "/subscriptions/$sub/resourceGroups/rg-IronTrail/providers/Microsoft.KeyVault/vaults/$kv"
-
-az role assignment delete --ids `
-  "$scope/providers/Microsoft.Authorization/roleAssignments/308855db-24a3-4a70-afd2-8743390715d8"
-```
-
-Then set `IRONTRAIL_GRANT_OWNER_KV_ACCESS=true` and provision. Verify
-afterwards that exactly two assignments exist on the vault (the UAMI and the
-owner) and that the owner's name is now the deterministic GUID.
+The random manual assignment created during recovery was removed before the
+declared role was applied. Bicep now owns the deterministic Key Vault
+assignment. Keep this rule: Azure treats a role assignment as unique per
+*(scope, principal, role)*, so an independently named manual assignment can
+block the declared assignment with `RoleAssignmentExists` (409).
 
 > **Note:** `azd provision --preview` does **not** render role assignments in
 > its resource summary — it was verified instead by inspecting the compiled ARM
@@ -158,8 +138,7 @@ isolation, suspension, and restoration gates are unchanged; capacity is not
 permission, since every non-owner member still requires a single-use invite and
 there are zero active invites.
 
-Applied to the AZD environment on 2026-08-01. Takes effect on the live app only
-after the next `azd provision`.
+Applied to the live Container App on 2026-08-01.
 
 ---
 
@@ -170,3 +149,27 @@ Verified on `stirontrailt5padq`: AES-256 SSE **plus**
 HTTPS-only, TLS 1.2 minimum. Customer-managed keys and client-side envelope
 encryption were both evaluated and rejected for the beta — rationale in
 `docs/persistent-dataset-design.md` §4.
+
+---
+
+## 4. Coach throughput and transient retries *(resolved 2026-08-21)*
+
+The initial 10K TPM deployments were enough for one user but left no practical
+headroom for two overlapping requests. Both Container App deployment paths
+also forced `IRONTRAIL_AI_MAX_RETRIES=0`, overriding the provider's safer
+default.
+
+Resolution:
+
+- `gpt-5-mini` reviews: 20K TPM.
+- `gpt-5.6-luna` chat: 30K TPM.
+- OpenAI SDK retries: 2, wired as a constrained Bicep string parameter.
+- The Stage C2 revision suffix includes the retry value, so changing it creates
+  a new revision rather than attempting to mutate an existing suffix.
+- The application euro cap and per-user limits remain unchanged.
+
+The model-specific regional quota was checked before either update. Each
+deployment retained its existing model version and DataZoneStandard SKU and
+was read back independently. Synthetic review/chat calls then completed
+through the real provider with one in-memory usage-ledger outcome per logical
+call.
