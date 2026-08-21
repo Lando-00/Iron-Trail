@@ -75,7 +75,10 @@ which is why the picker was previously scoped at 2–3 days. Both steps landed:
    bare `R, G, B` triples for the `rgba()` washes, borders and glows.
    `_CSS` now contains **no colour literal at all** (asserted by a test).
 2. `theme.PALETTES` holds `dark_gold` (byte-identical to before),
-   `high_contrast` and `amoled`. `theme.apply_palette()` mutates `COLORS` and
+   `high_contrast`, `amoled`, `blueprint`, `chalk_iron`, `phosphor` and
+   `daylight` — the last being the only light one, which is what exposed the
+   baked-in chrome colours described below. `theme.apply_palette()` mutates
+   `COLORS` and
    the derived chart maps **in place** — pages read `theme.COLORS[...]` at
    render time — and re-registers the Plotly template. `ui.setup_page()`
    applies it before any figure is built.
@@ -113,18 +116,37 @@ render call.
 primary, secondary and muted text against that palette's own background, so a
 new palette cannot ship below AA.
 
+### Palette-safe chrome
+
+`.streamlit/config.toml` bakes `textColor` and `secondaryBackgroundColor` into
+Streamlit's emotion classes **when the server starts**, so anything drawn from
+those values ignored the per-session `:root` block and stayed on the dark
+default whatever palette was asked for.
+
+- **`st.dataframe` could not be reached at all.** It paints cells onto a
+  canvas from the config theme, so no stylesheet reaches it and Recent
+  workouts rendered as a black slab on Daylight. It is now `ui.table()`,
+  which emits escaped HTML reading the same `--it-*` variables as everything
+  else. On Daylight the header measures `rgb(244,241,234)` on
+  `rgb(29,27,23)` ink; on `dark_gold` it is `rgb(10,10,12)` on
+  `rgb(231,231,233)` — i.e. each palette, not one baked default.
+- **Expander headers only cleared their configured background on hover**, so
+  the bar sat black under the palette's own dark ink and appeared to fix
+  itself under the cursor. The resting state now gets a palette surface too:
+  `rgba(overlay, 0.04)` at rest, `0.09` on hover, resolved against the active
+  palette's overlay triple. Verified in the sidebar container as well, which
+  is where the beta-access togglers live.
+- Controls inside those panels (`st.text`, `st.code`, checkbox) and the Volume
+  page's radio options were re-pointed at the palette for the same reason.
+
+Replacing the dataframe also settled the table's mobile layout for free: the
+wrapper is 358 wide with `scrollWidth` **356 against `clientWidth` 356**, so
+the horizontal scroll on a 3-column table is gone (it was 358/367), and the
+dataframe hover toolbar — the last sub-44px control on mobile at 22.4×22.4 —
+no longer exists (`stElementToolbar` count is 0 at both viewports). Type
+steps 12px → 11px and cell padding `10px 14px` → `9px 10px` below 720px.
+
 ## Deferred (with rationale)
-
-### Overview "recent workouts" table — *medium effort*
-
-`st.dataframe` measures 358 wide with `scrollWidth` 367, so it scrolls
-horizontally for a 3-column table. Replacing it with stacked card rows on
-mobile would read better, but it changes a core Overview element and deserves
-a design opinion first.
-
-Streamlit's dataframe hover toolbar (Search / Download / Fullscreen) is the one
-remaining sub-44px control on mobile, at **22.4×22.4**. It belongs with this
-item: if the table becomes cards, the toolbar goes away with it.
 
 ### Badge grid — *medium effort*
 
@@ -146,7 +168,7 @@ styling one.
 |---:|---|---|---|---|
 | 1 | Mobile Plotly defaults helper | High | Medium | **done** |
 | 2 | CSS custom properties refactor | High (enables theming) | Medium | **done** |
-| 3 | Overview recent-workouts mobile cards | Medium | Medium | deferred |
+| 3 | Overview recent-workouts table | Medium | Medium | **done** *(themed HTML table; cards not needed)* |
 | 4 | Badge CSS grid | Medium | Medium | deferred |
 | 5 | Volume legend grouping | Medium | Medium | **done** |
 | 6 | Theme picker UI | Medium | Low *(after #2)* | **done** |
