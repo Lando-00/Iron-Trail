@@ -50,6 +50,9 @@
     "grantOwnerKeyVaultAccess": {
       "value": "${IRONTRAIL_GRANT_OWNER_KV_ACCESS=false}"
     },
+    "grantOwnerStorageDiagnosticAccess": {
+      "value": "${IRONTRAIL_GRANT_OWNER_STORAGE_DIAGNOSTIC_ACCESS=false}"
+    },
     "googleClientId": {
       "value": "${IRONTRAIL_GOOGLE_CLIENT_ID}"
     },

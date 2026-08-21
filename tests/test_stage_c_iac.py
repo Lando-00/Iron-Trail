@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 ROOT = Path(__file__).parents[1]
 
 
@@ -34,6 +33,38 @@ def test_owner_key_vault_grant_is_declared_in_iac_and_defaults_off() -> None:
     assert "principalType: 'User'" in patch
 
     assert "IRONTRAIL_GRANT_OWNER_KV_ACCESS" in parameters
+
+
+def test_owner_storage_diagnostics_are_table_only_and_default_off() -> None:
+    main = (ROOT / "infra" / "main.bicep").read_text(encoding="utf-8")
+    application = (ROOT / "infra" / "modules" / "application.bicep").read_text(
+        encoding="utf-8"
+    )
+    patch = (ROOT / "infra" / "modules" / "stage_c2_patch.bicep").read_text(
+        encoding="utf-8"
+    )
+    parameters = (ROOT / "infra" / "main.parameters.json").read_text(encoding="utf-8")
+
+    for template in (main, application, patch):
+        assert "param grantOwnerStorageDiagnosticAccess string = 'false'" in template
+
+    assert main.count(
+        "grantOwnerStorageDiagnosticAccess: grantOwnerStorageDiagnosticAccess"
+    ) == 2
+    assert "IRONTRAIL_GRANT_OWNER_STORAGE_DIAGNOSTIC_ACCESS=false" in parameters
+    assert "76199698-9eea-4c19-bc75-cec21354c6b6" in application
+    assert "76199698-9eea-4c19-bc75-cec21354c6b6" in patch
+    assert "toLower(grantOwnerStorageDiagnosticAccess) == 'true'" in application
+    assert "toLower(grantOwnerStorageDiagnosticAccess) == 'true'" in patch
+    assert "scope: storageAccount" in patch
+
+    owner_diagnostic_block = patch.split(
+        "resource ownerStorageDiagnosticAccess", maxsplit=1
+    )[1].split("resource betaRevealSeedSecret", maxsplit=1)[0]
+    assert "storageTableDataReaderRoleId" in owner_diagnostic_block
+    assert "principalId: ownerObjectId" in owner_diagnostic_block
+    assert "storageBlobContributorRoleId" not in owner_diagnostic_block
+    assert "Storage Blob Data Reader" not in owner_diagnostic_block
 
 
 def test_stage_c_bicep_uses_matching_lifecycle_and_health_paths() -> None:

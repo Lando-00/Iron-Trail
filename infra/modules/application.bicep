@@ -44,6 +44,13 @@ param ownerObjectId string
 @description('Grant the owner Key Vault Secrets User for break-glass recovery.')
 param grantOwnerKeyVaultAccess string = 'false'
 
+@allowed([
+  'false'
+  'true'
+])
+@description('Temporarily grant the owner Storage Table Data Reader for diagnostics.')
+param grantOwnerStorageDiagnosticAccess string = 'false'
+
 @description('Current deployed image retained when reconciling an existing beta.')
 param currentContainerImage string = ''
 
@@ -107,6 +114,7 @@ var authProviders = googleAuthConfigured ? 'aad,google' : 'aad'
 var acrPullRoleId = '7f951dda-4ed3-4680-a7ca-43fe172d538d'
 var storageBlobContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
 var storageTableContributorRoleId = '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
+var storageTableDataReaderRoleId = '76199698-9eea-4c19-bc75-cec21354c6b6'
 var keyVaultSecretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6'
 var cognitiveServicesOpenAiUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
 
@@ -239,18 +247,29 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.32.1' = {
       defaultAction: 'Allow'
     }
     publicNetworkAccess: 'Enabled'
-    roleAssignments: [
-      {
-        principalId: managedIdentity.outputs.principalId
-        principalType: 'ServicePrincipal'
-        roleDefinitionIdOrName: storageBlobContributorRoleId
-      }
-      {
-        principalId: managedIdentity.outputs.principalId
-        principalType: 'ServicePrincipal'
-        roleDefinitionIdOrName: storageTableContributorRoleId
-      }
-    ]
+    roleAssignments: concat(
+      [
+        {
+          principalId: managedIdentity.outputs.principalId
+          principalType: 'ServicePrincipal'
+          roleDefinitionIdOrName: storageBlobContributorRoleId
+        }
+        {
+          principalId: managedIdentity.outputs.principalId
+          principalType: 'ServicePrincipal'
+          roleDefinitionIdOrName: storageTableContributorRoleId
+        }
+      ],
+      toLower(grantOwnerStorageDiagnosticAccess) == 'true'
+        ? [
+            {
+              principalId: ownerObjectId
+              principalType: 'User'
+              roleDefinitionIdOrName: storageTableDataReaderRoleId
+            }
+          ]
+        : []
+    )
     skuName: 'Standard_LRS'
     supportsHttpsTrafficOnly: true
     tableServices: {

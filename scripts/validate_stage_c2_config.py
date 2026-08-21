@@ -7,6 +7,14 @@ from collections.abc import Mapping
 
 def validate_config(environ: Mapping[str, str] | None = None) -> None:
     env = environ or os.environ
+    storage_diagnostics_raw = env.get(
+        "IRONTRAIL_GRANT_OWNER_STORAGE_DIAGNOSTIC_ACCESS", "false"
+    ).strip().lower()
+    if storage_diagnostics_raw not in {"false", "true"}:
+        raise ValueError(
+            "IRONTRAIL_GRANT_OWNER_STORAGE_DIAGNOSTIC_ACCESS must be false or true."
+        )
+
     enabled_raw = env.get("IRONTRAIL_GOOGLE_AUTH_ENABLED", "").strip().lower()
     if enabled_raw not in {"false", "true"}:
         raise ValueError("IRONTRAIL_GOOGLE_AUTH_ENABLED must be false or true.")

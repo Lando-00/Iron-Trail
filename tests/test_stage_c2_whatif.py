@@ -4,7 +4,6 @@ import importlib.util
 import sys
 from pathlib import Path
 
-
 SCRIPT = Path(__file__).parents[1] / "scripts" / "validate_stage_c2_whatif.py"
 SPEC = importlib.util.spec_from_file_location("validate_stage_c2_whatif", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
@@ -47,6 +46,7 @@ def validate(*changes: dict[str, object], owner_object_id: str | None = None) ->
         subscription_id=SUBSCRIPTION,
         resource_group=RESOURCE_GROUP,
         owner_object_id=owner_object_id,
+        storage_account_name="stirontrailexample",
     )
 
 
@@ -55,6 +55,13 @@ KV_ROLE_ASSIGNMENT = (
     f"{PREFIX}Microsoft.KeyVault/vaults/kv-irontrail-example/"
     "providers/Microsoft.Authorization/roleAssignments/"
     "11111111-2222-3333-4444-555555555555"
+)
+STORAGE_ACCOUNT = (
+    f"{PREFIX}Microsoft.Storage/storageAccounts/stirontrailexample"
+)
+STORAGE_ROLE_ASSIGNMENT = (
+    f"{STORAGE_ACCOUNT}/providers/Microsoft.Authorization/roleAssignments/"
+    "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 )
 
 
@@ -77,6 +84,30 @@ def role_assignment_change(
             }
         },
     }
+
+
+def storage_role_assignment_change(
+    *,
+    kind: str = "Create",
+    role_id: str = whatif.STORAGE_TABLE_DATA_READER_ROLE_ID,
+    principal_id: str = OWNER,
+    resource_id: str = STORAGE_ROLE_ASSIGNMENT,
+) -> dict[str, object]:
+    snapshot = {
+        "properties": {
+            "roleDefinitionId": (
+                f"/subscriptions/{SUBSCRIPTION}/providers/"
+                f"Microsoft.Authorization/roleDefinitions/{role_id}"
+            ),
+            "principalId": principal_id,
+        }
+    }
+    result: dict[str, object] = {
+        "changeType": kind,
+        "resourceId": resource_id,
+    }
+    result["before" if kind == "Delete" else "after"] = snapshot
+    return result
 
 
 def test_owner_key_vault_grant_is_allowed_when_expected() -> None:
@@ -111,6 +142,101 @@ def test_owner_key_vault_grant_rejects_delete_and_modify() -> None:
 def test_owner_key_vault_grant_requires_an_expected_owner() -> None:
     issues = validate(role_assignment_change())
 
+    assert any("expected owner object ID" in issue for issue in issues)
+
+
+def test_owner_storage_table_reader_create_and_delete_are_allowed() -> None:
+    assert (
+        validate(storage_role_assignment_change(), owner_object_id=OWNER) == []
+    )
+    assert (
+        validate(
+            storage_role_assignment_change(kind="Delete"),
+            owner_object_id=OWNER,
+        )
+        == []
+    )
+
+
+def test_owner_storage_diagnostics_reject_modify() -> None:
+    issues = validate(
+        storage_role_assignment_change(kind="Modify"),
+        owner_object_id=OWNER,
+    )
+
+    assert any("must be Create or Delete" in issue for issue in issues)
+
+
+def test_owner_storage_diagnostics_reject_wrong_principal() -> None:
+    issues = validate(
+        storage_role_assignment_change(
+            principal_id="00000000-0000-0000-0000-000000000000"
+        ),
+        owner_object_id=OWNER,
+    )
+
+    assert any("approved owner principal" in issue for issue in issues)
+
+
+def test_owner_storage_diagnostics_reject_blob_or_contributor_roles() -> None:
+    for role_id in (
+        "2a2b9908-6ea1-4ae2-8e65-a410df84e7d1",  # Storage Blob Data Reader
+        "0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3",  # Storage Table Data Contributor
+    ):
+        issues = validate(
+            storage_role_assignment_change(role_id=role_id),
+            owner_object_id=OWNER,
+        )
+        assert any("Storage Table Data Reader" in issue for issue in issues)
+
+
+def test_owner_storage_diagnostics_require_an_exact_role_id() -> None:
+    issues = validate(
+        storage_role_assignment_change(
+            role_id=f"{whatif.STORAGE_TABLE_DATA_READER_ROLE_ID}-broader"
+        ),
+        owner_object_id=OWNER,
+    )
+
+    assert any("Storage Table Data Reader" in issue for issue in issues)
+
+
+def test_owner_storage_diagnostics_reject_wrong_scope() -> None:
+    container_scope = (
+        f"{STORAGE_ACCOUNT}/blobServices/default/containers/datasets/"
+        "providers/Microsoft.Authorization/roleAssignments/"
+        "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    )
+    issues = validate(
+        storage_role_assignment_change(resource_id=container_scope),
+        owner_object_id=OWNER,
+    )
+
+    assert any("scoped directly" in issue for issue in issues)
+
+
+def test_owner_storage_diagnostics_reject_wrong_account() -> None:
+    wrong_account = STORAGE_ROLE_ASSIGNMENT.replace(
+        "stirontrailexample",
+        "stirontrailother",
+    )
+    issues = validate(
+        storage_role_assignment_change(resource_id=wrong_account),
+        owner_object_id=OWNER,
+    )
+
+    assert any("approved storage-account scope" in issue for issue in issues)
+
+
+def test_owner_storage_diagnostics_require_expected_snapshot_and_owner() -> None:
+    missing_snapshot = {
+        "changeType": "Delete",
+        "resourceId": STORAGE_ROLE_ASSIGNMENT,
+    }
+    issues = validate(missing_snapshot, owner_object_id=OWNER)
+    assert any("before properties" in issue for issue in issues)
+
+    issues = validate(storage_role_assignment_change())
     assert any("expected owner object ID" in issue for issue in issues)
 
 
@@ -201,6 +327,42 @@ def test_stage_c2_whatif_accepts_capacity_only_update() -> None:
     )
 
     assert result == []
+
+
+def test_stage_c2_whatif_accepts_idempotent_container_reconciliation() -> None:
+    result = validate(
+        change(
+            "Modify",
+            CONTAINER_APP,
+            ("properties.template.containers", "Array"),
+        ),
+        change(
+            "Modify",
+            AUTH_CONFIG,
+            (
+                "properties.identityProviders.azureActiveDirectory.isAutoProvisioned",
+                "Delete",
+            ),
+        ),
+        change("NoChange", BETA_REVEAL_SECRET),
+    )
+
+    assert result == []
+
+
+def test_google_provider_change_still_requires_revision_update() -> None:
+    result = validate(
+        change(
+            "Modify",
+            CONTAINER_APP,
+            ("properties.configuration.secrets", "Array"),
+            ("properties.template.containers", "Array"),
+        ),
+        change("Modify", AUTH_CONFIG, ("properties.identityProviders.google", "Delete")),
+        change("NoChange", BETA_REVEAL_SECRET),
+    )
+
+    assert any("revision update" in issue for issue in result)
 
 
 def test_stage_c2_whatif_accepts_google_removal_without_secret_deletion() -> None:

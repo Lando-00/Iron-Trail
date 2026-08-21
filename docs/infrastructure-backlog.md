@@ -5,7 +5,7 @@ proposed change, and why it is not already done.
 
 ---
 
-## 1. Owner Key Vault access is not in IaC *(implemented 2026-08-01, not yet applied)*
+## 1. Owner diagnostic access *(resolved 2026-08-21)*
 
 **Found:** 2026-08-01, while restoring the lost `beta` AZD environment.
 
@@ -112,32 +112,36 @@ adds no privilege they lack; it makes the access *declared and auditable*
 instead of improvised. The flag still defaults to `'false'`, so nothing is
 granted unless an environment opts in.
 
+### Storage diagnostics implemented
+
+Storage uses the same data-plane RBAC boundary: subscription Owner cannot read
+`IronTrailAuth`, `IronTrailData`, or `IronTrailUsage`. Standing access is not
+warranted, and Blob access would expose workout files, so Storage diagnostics
+remain separate from permanent Key Vault recovery:
+
+- `IRONTRAIL_GRANT_OWNER_STORAGE_DIAGNOSTIC_ACCESS=false` is the default.
+- Enabling it grants exactly **Storage Table Data Reader** to the approved
+  owner at the storage-account scope.
+- Both full and Stage C2 Bicep paths use deterministic role assignments.
+- The what-if allowlist pins the principal, role, scope, and Create/Delete
+  directions; Blob Reader and contributor roles are rejected.
+- `scripts/audit_beta_state.py` reports only redacted aggregates for
+  membership, invites, retention, usage, revision health, and model capacity.
+
+The enable-audit-disable workflow was live-tested on 2026-08-21. One important
+ARM behavior was confirmed: an incremental deployment does **not** delete a
+conditional role assignment when its flag becomes false, even though provider
+what-if reports a Delete. After setting the flag back to false, revoke the one
+exact assignment explicitly by resource ID and verify zero owner roles remain
+at the storage scope. Never use a broad role or assignee delete.
+
 ### Still open
-
-- **The same RBAC gap exists on Storage.** On 2026-08-01, verifying who was
-  enrolled in the beta required `az role assignment create ... "Storage Table
-  Data Reader"` because subscription Owner grants no data-plane read on
-  `IronTrailAuth` / `IronTrailData` either. The grant was removed again
-  afterwards, leaving only the two managed-identity assignments.
-
-  The in-app admin controls cover normal membership questions, so standing
-  human access is not warranted. But incident response should not depend on
-  improvising a role assignment. Extend `grantOwnerKeyVaultAccess` into a
-  single `grantOwnerDiagnosticAccess` flag covering Key Vault *and* read-only
-  Storage table access, so break-glass is declared in one reviewable place.
 
 - **No backup of the non-secret AZD keys.** Losing `.azure/beta/.env` cost an
   hour of recovery. The values are reconstructible from the live resources (see
   `docs/restore-beta-env.md`), but that should be a script, not archaeology.
   Suggest `scripts/export_beta_env_template.py` that writes the **key names
   only**, safe to commit.
-
-- **Plan drift is not detectable.** The plan claimed "No invite was generated
-  or redeemed" for a week after a member had in fact enrolled, and separately
-  claimed `maxUsers=1` while the live app ran `2`. Both were only caught by
-  reading Azure directly. A read-only `scripts/audit_beta_state.py` that prints
-  member count, invite state and key env values would make the plan verifiable
-  instead of trusted.
 
 ---
 

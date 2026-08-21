@@ -20,6 +20,14 @@ def test_google_disabled_does_not_require_unused_credentials() -> None:
     validate_config(_base())
 
 
+def test_storage_diagnostic_flag_must_be_boolean_text() -> None:
+    config = _base()
+    config["IRONTRAIL_GRANT_OWNER_STORAGE_DIAGNOSTIC_ACCESS"] = "sometimes"
+
+    with pytest.raises(ValueError, match="STORAGE_DIAGNOSTIC_ACCESS"):
+        validate_config(config)
+
+
 def test_google_enabled_requires_complete_web_client_credentials() -> None:
     config = _base()
     config["IRONTRAIL_GOOGLE_AUTH_ENABLED"] = "true"

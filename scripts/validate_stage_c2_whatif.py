@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 KEY_VAULT_SECRETS_USER_ROLE_ID = "4633458b-17de-408a-b874-0445c86b69e6"
+STORAGE_TABLE_DATA_READER_ROLE_ID = "76199698-9eea-4c19-bc75-cec21354c6b6"
 
 
 def _changes(payload: Any) -> list[dict[str, Any]]:
@@ -35,12 +36,17 @@ def _delta_pairs(change: dict[str, Any]) -> set[tuple[str, str]]:
     }
 
 
+def _role_id(role_definition: Any) -> str:
+    return str(role_definition or "").rstrip("/").rsplit("/", maxsplit=1)[-1].lower()
+
+
 def validate_stage_c2_whatif(
     payload: Any,
     *,
     subscription_id: str,
     resource_group: str,
     owner_object_id: str | None = None,
+    storage_account_name: str | None = None,
 ) -> list[str]:
     changes = _changes(payload)
     if not changes:
@@ -53,6 +59,8 @@ def validate_stage_c2_whatif(
     key_vault_secret_id = (
         f"{resource_prefix}microsoft.keyvault/vaults/kv-irontrail-"
     )
+    storage_accounts_id = f"{resource_prefix}microsoft.storage/storageaccounts/"
+    role_assignment_marker = "/providers/microsoft.authorization/roleassignments/"
     allowed_container_deltas = {
         ("properties.configuration.secrets", "Array"),
         ("properties.runningStatus", "Delete"),
@@ -61,7 +69,6 @@ def validate_stage_c2_whatif(
     }
     required_container_deltas = {
         ("properties.template.containers", "Array"),
-        ("properties.template.revisionSuffix", "Modify"),
     }
     allowed_auth_deltas = {
         (
@@ -78,6 +85,8 @@ def validate_stage_c2_whatif(
     saw_google_secret = False
     saw_beta_reveal_secret = False
     saw_google_provider_create = False
+    saw_google_provider_change = False
+    saw_revision_suffix_delta = False
     issues: list[str] = []
 
     for change in changes:
@@ -103,7 +112,13 @@ def validate_stage_c2_whatif(
         )
         is_key_vault_role_assignment = (
             lowered_id.startswith(key_vault_secret_id)
-            and "/providers/microsoft.authorization/roleassignments/" in lowered_id
+            and role_assignment_marker in lowered_id
+        )
+        storage_scope = lowered_id.partition(role_assignment_marker)[0]
+        storage_name = storage_scope.removeprefix(storage_accounts_id)
+        is_storage_role_assignment = (
+            role_assignment_marker in lowered_id
+            and storage_scope.startswith(storage_accounts_id)
         )
 
         if change_type in {"ignore", "nochange"}:
@@ -127,6 +142,10 @@ def validate_stage_c2_whatif(
             saw_container_secret_delta = (
                 saw_container_secret_delta
                 or ("properties.configuration.secrets", "Array") in actual_deltas
+            )
+            saw_revision_suffix_delta = (
+                saw_revision_suffix_delta
+                or ("properties.template.revisionSuffix", "Modify") in actual_deltas
             )
             if unexpected_deltas:
                 issues.append(
@@ -166,6 +185,9 @@ def validate_stage_c2_whatif(
                 ("properties.identityProviders.google", "Create"),
                 ("properties.identityProviders.google", "Delete"),
             }.intersection(actual_deltas)
+            saw_google_provider_change = (
+                saw_google_provider_change or bool(google_provider_deltas)
+            )
             aad_metadata_only = actual_deltas <= {
                 (
                     "properties.identityProviders.azureActiveDirectory.isAutoProvisioned",
@@ -207,9 +229,9 @@ def validate_stage_c2_whatif(
             after = change.get("after")
             properties = after.get("properties") if isinstance(after, dict) else None
             properties = properties if isinstance(properties, dict) else {}
-            role_definition = str(properties.get("roleDefinitionId", "")).lower()
+            role_definition = _role_id(properties.get("roleDefinitionId"))
             principal_id = str(properties.get("principalId", "")).strip().lower()
-            if KEY_VAULT_SECRETS_USER_ROLE_ID not in role_definition:
+            if role_definition != KEY_VAULT_SECRETS_USER_ROLE_ID:
                 issues.append(
                     "Key Vault role assignment must grant Key Vault Secrets User."
                 )
@@ -220,6 +242,61 @@ def validate_stage_c2_whatif(
             elif principal_id != owner_object_id.strip().lower():
                 issues.append(
                     "Key Vault role assignment must target the approved owner principal."
+                )
+            continue
+
+        if is_storage_role_assignment:
+            # The owner may temporarily read Table metadata for diagnostics.
+            # Create and Delete are both required for the explicit
+            # enable-audit-disable workflow; the principal, role, and
+            # storage-account scope remain pinned in either direction.
+            expected_storage_name = (storage_account_name or "").strip().lower()
+            if not expected_storage_name:
+                issues.append(
+                    "Storage diagnostic role assignment requires an expected "
+                    "storage account name."
+                )
+            elif storage_name != expected_storage_name:
+                issues.append(
+                    "Storage diagnostic role assignment must use the approved "
+                    "storage-account scope."
+                )
+            if "/" in storage_name:
+                issues.append(
+                    "Storage diagnostic role assignment must be scoped directly "
+                    "to the storage account."
+                )
+            if change_type not in {"create", "delete"}:
+                issues.append(
+                    "Storage diagnostic role assignment must be Create or Delete, "
+                    f"found {change_type or 'unknown'}."
+                )
+                continue
+            snapshot_name = "after" if change_type == "create" else "before"
+            snapshot = change.get(snapshot_name)
+            properties = snapshot.get("properties") if isinstance(snapshot, dict) else None
+            if not isinstance(properties, dict):
+                issues.append(
+                    "Storage diagnostic role assignment is missing its "
+                    f"{snapshot_name} properties."
+                )
+                continue
+            role_definition = _role_id(properties.get("roleDefinitionId"))
+            principal_id = str(properties.get("principalId", "")).strip().lower()
+            if role_definition != STORAGE_TABLE_DATA_READER_ROLE_ID:
+                issues.append(
+                    "Storage diagnostic role assignment must grant "
+                    "Storage Table Data Reader."
+                )
+            if not owner_object_id:
+                issues.append(
+                    "Storage diagnostic role assignment requires an expected "
+                    "owner object ID."
+                )
+            elif principal_id != owner_object_id.strip().lower():
+                issues.append(
+                    "Storage diagnostic role assignment must target the approved "
+                    "owner principal."
                 )
             continue
 
@@ -237,6 +314,8 @@ def validate_stage_c2_whatif(
         )
     if saw_google_provider_create and not saw_google_secret:
         issues.append("Adding Google authentication requires the Google Key Vault secret.")
+    if saw_google_provider_change and not saw_revision_suffix_delta:
+        issues.append("Google provider changes require a Container App revision update.")
     return issues
 
 
@@ -249,6 +328,10 @@ def main() -> int:
         "--owner-object-id",
         help="Entra object ID permitted to receive the Key Vault break-glass grant.",
     )
+    parser.add_argument(
+        "--storage-account-name",
+        help="Storage account permitted to receive the temporary diagnostic grant.",
+    )
     args = parser.parse_args()
 
     payload = json.loads(args.whatif.read_text(encoding="utf-8"))
@@ -257,6 +340,7 @@ def main() -> int:
         subscription_id=args.subscription_id,
         resource_group=args.resource_group,
         owner_object_id=args.owner_object_id,
+        storage_account_name=args.storage_account_name,
     )
     print(json.dumps({"ok": not issues, "issues": issues}, indent=2))
     return 1 if issues else 0

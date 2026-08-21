@@ -68,6 +68,13 @@ param ownerObjectId string
 @description('Grant the owner Key Vault Secrets User for break-glass recovery.')
 param grantOwnerKeyVaultAccess string = 'false'
 
+@allowed([
+  'false'
+  'true'
+])
+@description('Temporarily grant the owner Storage Table Data Reader for diagnostics.')
+param grantOwnerStorageDiagnosticAccess string = 'false'
+
 @minLength(1)
 @description('Current deployed Container App image, supplied by AZD metadata.')
 param currentContainerImage string
@@ -98,6 +105,7 @@ var unauthenticatedClientAction = toLower(authReady) == 'true' ? 'AllowAnonymous
 var googleAuthConfigured = toLower(googleAuthEnabled) == 'true'
 var authProviders = googleAuthConfigured ? 'aad,google' : 'aad'
 var keyVaultSecretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6'
+var storageTableDataReaderRoleId = '76199698-9eea-4c19-bc75-cec21354c6b6'
 var revisionSuffix = 'c2-${take(uniqueString(containerAppName, googleAuthEnabled, googleClientId, maxUsers), 8)}'
 var googleIdentityProvider = googleAuthConfigured ? {
   google: {
@@ -133,6 +141,10 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyVaultName
 }
 
+resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
+  name: storageAccountName
+}
+
 var keyVaultUri = keyVault.properties.vaultUri
 
 // Break-glass: the vault uses RBAC, so subscription Owner alone cannot read
@@ -149,6 +161,23 @@ resource ownerKeyVaultAccess 'Microsoft.Authorization/roleAssignments@2022-04-01
       roleDefinitionId: subscriptionResourceId(
         'Microsoft.Authorization/roleDefinitions',
         keyVaultSecretsUserRoleId
+      )
+    }
+  }
+
+// Table metadata is sufficient for membership, retention, and usage audits.
+// Blob Reader is intentionally excluded so the operator cannot download
+// workout files through this diagnostic grant.
+resource ownerStorageDiagnosticAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' =
+  if (toLower(grantOwnerStorageDiagnosticAccess) == 'true') {
+    scope: storageAccount
+    name: guid(storageAccount.id, ownerObjectId, storageTableDataReaderRoleId)
+    properties: {
+      principalId: ownerObjectId
+      principalType: 'User'
+      roleDefinitionId: subscriptionResourceId(
+        'Microsoft.Authorization/roleDefinitions',
+        storageTableDataReaderRoleId
       )
     }
   }

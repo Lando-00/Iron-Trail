@@ -55,6 +55,15 @@ param grantOwnerKeyVaultAccess string = 'false'
   'false'
   'true'
 ])
+@description('''Temporarily grant the owner Storage Table Data Reader for
+read-only beta diagnostics. This deliberately excludes Blob data access and
+defaults off so the role exists only during an explicit audit.''')
+param grantOwnerStorageDiagnosticAccess string = 'false'
+
+@allowed([
+  'false'
+  'true'
+])
 @description('Whether the verified login landing page may accept anonymous requests.')
 param authReady string = 'false'
 
@@ -126,6 +135,7 @@ module application './modules/application.bicep' = if (!stageC2PatchEnabled) {
     chatDeploymentName: empty(chatDeploymentName) ? modelDeploymentName : chatDeploymentName
     ownerObjectId: ownerObjectId
     grantOwnerKeyVaultAccess: grantOwnerKeyVaultAccess
+    grantOwnerStorageDiagnosticAccess: grantOwnerStorageDiagnosticAccess
     currentContainerImage: currentContainerImage
   }
 }
@@ -149,6 +159,7 @@ module stageC2Patch './modules/stage_c2_patch.bicep' = if (stageC2PatchEnabled) 
     chatDeploymentName: empty(chatDeploymentName) ? modelDeploymentName : chatDeploymentName
     ownerObjectId: ownerObjectId
     grantOwnerKeyVaultAccess: grantOwnerKeyVaultAccess
+    grantOwnerStorageDiagnosticAccess: grantOwnerStorageDiagnosticAccess
     currentContainerImage: currentContainerImage
     currentWebUrl: currentWebUrl
   }
