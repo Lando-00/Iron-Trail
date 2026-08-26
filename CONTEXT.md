@@ -15,8 +15,27 @@ bounded dashboard views, and optional Markdown writeback to an Obsidian Vault.
   Strength, Hypertrophy, Pump, or Quick.
 - **Plateau**: an exercise whose e1RM has not achieved a meaningful PR within
   the configured time window, with regression treated separately.
-- **Coach**: the review pipeline that builds a structured statistical summary,
+- **Coach**: the AI training assistant as a whole. It has two distinct
+  surfaces, **Coach review** and **Coach chat**, which share a provider and a
+  grounding discipline but nothing else.
+- **Coach review**: the pipeline that builds a structured statistical summary,
   obtains bounded prose from an LLM, and renders the final Markdown/PDF output.
+- **Coach chat**: the conversational surface, where the user asks a question in
+  their own words and the Coach answers from their own training data.
+- **Query surface**: the enumerated set of typed questions Coach chat may ask
+  of a user's training data. The model chooses which query to run and with what
+  arguments; it never authors the computation and never sees data outside the
+  surface.
+- **Orientation payload**: what Coach chat knows before it asks anything — the
+  name of every exercise the user has logged, plus headline training stats. It
+  is the vocabulary the model draws its query arguments from, so every logged
+  lift appears in it and no lift is ever invented.
+- **Movement pattern**: the mechanical grouping of an exercise, such as
+  horizontal push or vertical pull. It cuts across primary muscle: close-grip
+  bench is triceps-primary but shares its pattern with the barbell bench.
+- **Related exercises**: the lifts a user has actually logged that share a
+  movement pattern with a named exercise. Relatedness is mechanical, not
+  muscular, and is always bounded by what the user trains.
 - **Vault writeback**: explicit generation of Markdown notes under a user-
   selected output directory; it is not an implicit cloud sync.
 - **Profile**: durable per-user settings that outlive a Streamlit session.
@@ -41,8 +60,17 @@ bounded dashboard views, and optional Markdown writeback to an Obsidian Vault.
   mode.
 - Real workout data is private and must remain outside Git. Synthetic sample
   data is the safe public-demo fixture.
-- Numeric facts in reviews come from the structured summary; the LLM supplies
-  reflections and prose, not authoritative measurements.
+- The **Coach chat allowance** is counted in questions, not in provider calls.
+  One question the user asks is one unit of allowance, however many calls
+  answering it happens to take.
+- Numeric facts come from deterministic computation over the training data;
+  the LLM supplies reflections and prose, not authoritative measurements. This
+  holds for Coach review and Coach chat alike.
+- **Structured data** is the machine-derived fields of a set: exercise name,
+  weight, reps, set type, set order, and dates. **Free text** is what a human
+  typed: workout titles and descriptions, and exercise notes. Structured data
+  may reach the model. Free text may not, and is treated as untrusted input
+  wherever it is handled.
 
 ## Locked project shape
 
